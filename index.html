@@ -1262,13 +1262,22 @@ function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
 
 function initFirebase(cfg) {
   try {
-    firebaseApp = initializeApp({
-      apiKey: cfg.apiKey,
-      authDomain: cfg.authDomain || `${cfg.projectId}.firebaseapp.com`,
-      databaseURL: cfg.databaseURL,
-      projectId: cfg.projectId,
-      appId: cfg.appId,
-    });
+    const firebaseConfig = {
+
+  apiKey: "AIzaSyAe9lmn8tI66X622ltNw1oTUmSls3ScAG8",
+
+  authDomain: "live-lead-distributor.firebaseapp.com",
+
+  projectId: "live-lead-distributor",
+
+  storageBucket: "live-lead-distributor.firebasestorage.app",
+
+  messagingSenderId: "884417621256",
+
+  appId: "1:884417621256:web:362cbe9b603b96ede390bd"
+
+};
+
     db = getDatabase(firebaseApp);
 
     // Check if any users exist
