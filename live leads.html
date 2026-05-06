@@ -1,0 +1,2913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relay · Lead Handover System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0d0b;
+    --bg-2: #161412;
+    --panel: #1c1916;
+    --panel-2: #221e1a;
+    --line: #2a2521;
+    --line-2: #3a332d;
+    --ink: #f4ede2;
+    --ink-dim: #b3a89a;
+    --ink-mute: #7a7065;
+    --accent: #d97706;
+    --accent-2: #f59e0b;
+    --good: #84cc16;
+    --bad: #ef4444;
+    --busy: #f59e0b;
+    --info: #38bdf8;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse at top right, rgba(217, 119, 6, 0.08), transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(132, 204, 22, 0.04), transparent 50%);
+  }
+
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none; opacity: 0.5; z-index: 1;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--line);
+    background: rgba(14, 13, 11, 0.85);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 50;
+  }
+
+  .header-inner {
+    max-width: 1400px; margin: 0 auto;
+    padding: 18px 32px;
+    display: grid; grid-template-columns: auto 1fr auto;
+    align-items: center; gap: 32px;
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+  .brand-mark {
+    font-family: var(--serif); font-weight: 600; font-size: 22px;
+    letter-spacing: -0.02em; font-style: italic;
+  }
+  .brand-mark::first-letter { color: var(--accent); }
+  .brand-sub {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-mute);
+    text-transform: uppercase; letter-spacing: 0.15em;
+    border-left: 1px solid var(--line-2); padding-left: 12px;
+  }
+
+  nav.tabs { display: flex; gap: 4px; justify-self: center; flex-wrap: wrap; }
+  .tab {
+    background: transparent; border: none; color: var(--ink-mute);
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    padding: 8px 16px; cursor: pointer; border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--ink-dim); background: var(--panel); }
+  .tab.active { color: var(--ink); background: var(--panel-2); }
+
+  .header-status { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--ink-mute); }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 6px 10px 6px 6px; border-radius: 999px;
+  }
+  .user-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 12px; font-weight: 600; color: #1a1410;
+  }
+  .user-avatar.pc { background: linear-gradient(135deg, var(--info), #0ea5e9); color: #0a1929; }
+  .user-avatar.admin { background: linear-gradient(135deg, var(--good), #65a30d); color: #0a1410; }
+
+  .user-info { display: flex; flex-direction: column; line-height: 1.1; }
+  .user-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .user-role { font-family: var(--mono); font-size: 9px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--good); animation: pulse 2s infinite;
+  }
+  .live-dot.offline { background: var(--ink-mute); animation: none; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(132, 204, 22, 0.5); }
+    70% { box-shadow: 0 0 0 8px rgba(132, 204, 22, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(132, 204, 22, 0); }
+  }
+
+  .btn-link {
+    background: none; border: none; color: var(--ink-mute);
+    cursor: pointer; font-size: 12px; font-family: var(--sans); text-decoration: underline;
+  }
+  .btn-link:hover { color: var(--ink); }
+
+  /* VIEW-AS (admin) */
+  .view-as-bar {
+    background: linear-gradient(90deg, rgba(132,204,22,0.08), transparent);
+    border-bottom: 1px solid rgba(132,204,22,0.2);
+    padding: 10px 32px; display: none;
+    align-items: center; gap: 16px; font-size: 12px;
+  }
+  .view-as-bar.show { display: flex; }
+  .view-as-bar strong {
+    font-family: var(--mono); color: var(--good);
+    text-transform: uppercase; letter-spacing: 0.1em; font-size: 11px;
+  }
+  .view-as-options { display: flex; gap: 4px; background: var(--bg); padding: 3px; border-radius: 4px; }
+  .view-as-options button {
+    background: transparent; border: none; color: var(--ink-mute);
+    padding: 5px 12px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--sans);
+  }
+  .view-as-options button.active { background: var(--panel); color: var(--ink); }
+
+  /* LAYOUT */
+  main { max-width: 1400px; margin: 0 auto; padding: 40px 32px 80px; position: relative; z-index: 2; }
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* LOGIN */
+  .login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px; position: relative; z-index: 2;
+  }
+  .login-card {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 48px; border-radius: 6px; max-width: 440px; width: 100%;
+    position: relative; overflow: hidden;
+  }
+  .login-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--accent);
+  }
+  .login-brand {
+    font-family: var(--serif); font-size: 36px; font-weight: 500;
+    letter-spacing: -0.02em; margin-bottom: 4px; font-style: italic;
+  }
+  .login-brand::first-letter { color: var(--accent); }
+  .login-tag {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-mute);
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 32px;
+  }
+  .login-title { font-family: var(--serif); font-size: 22px; margin-bottom: 8px; }
+  .login-sub { color: var(--ink-dim); font-size: 13px; margin-bottom: 24px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-family: var(--mono); font-size: 10px;
+    color: var(--ink-mute); text-transform: uppercase;
+    letter-spacing: 0.12em; margin-bottom: 8px;
+  }
+
+  .input {
+    width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--ink); padding: 12px 16px; font-family: var(--sans);
+    font-size: 14px; border-radius: 3px; transition: border-color 0.15s;
+  }
+  .input:focus { outline: none; border-color: var(--accent); }
+
+  /* PIN ENTRY */
+  .pin-display {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 20px;
+  }
+  .pin-cell {
+    aspect-ratio: 1; max-height: 64px;
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 32px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .pin-cell.filled { border-color: var(--accent); color: var(--accent); }
+  .pin-cell.error { border-color: var(--bad); color: var(--bad); animation: shake 0.4s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  .pin-pad {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px; margin-bottom: 16px;
+  }
+  .pin-key {
+    aspect-ratio: 2/1; background: var(--bg); border: 1px solid var(--line);
+    color: var(--ink); font-family: var(--serif); font-size: 22px;
+    font-weight: 500; cursor: pointer; border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .pin-key:hover { background: var(--panel-2); border-color: var(--line-2); }
+  .pin-key:active { transform: scale(0.96); }
+  .pin-key.action { font-size: 13px; font-family: var(--sans); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-mute); }
+
+  .login-msg {
+    background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5; padding: 10px 14px; border-radius: 3px;
+    font-size: 12px; margin-bottom: 16px; display: none;
+  }
+  .login-msg.show { display: block; }
+  .login-msg.success { background: rgba(132, 204, 22, 0.1); border-color: rgba(132, 204, 22, 0.3); color: #bef264; }
+  .login-msg.warn { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+
+  /* SELECT */
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b3a89a' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 16px center;
+    padding-right: 40px;
+  }
+  select.input option { background: var(--panel); color: var(--ink); }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: var(--accent); color: #1a1410; border: none;
+    padding: 14px 32px; font-family: var(--sans); font-size: 14px;
+    font-weight: 600; letter-spacing: 0.02em; cursor: pointer;
+    border-radius: 4px; transition: all 0.15s; text-transform: uppercase;
+    width: 100%;
+  }
+  .btn-primary:hover { background: var(--accent-2); transform: translateY(-1px); }
+  .btn-primary:disabled { background: var(--line-2); color: var(--ink-mute); cursor: not-allowed; transform: none; }
+
+  .btn {
+    background: transparent; border: 1px solid var(--line-2); color: var(--ink-dim);
+    padding: 9px 12px; font-family: var(--sans); font-size: 12px;
+    font-weight: 600; cursor: pointer; border-radius: 3px;
+    transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .btn:hover { border-color: var(--ink-mute); color: var(--ink); }
+  .btn-good { background: rgba(132,204,22,0.1); border-color: rgba(132,204,22,0.3); color: var(--good); }
+  .btn-good:hover { background: var(--good); color: #0a0a0a; border-color: var(--good); }
+  .btn-bad { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--bad); }
+  .btn-bad:hover { background: var(--bad); color: white; border-color: var(--bad); }
+  .btn-warn:hover { background: var(--bad); color: white; border-color: var(--bad); }
+  .btn-info { background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.3); color: var(--info); }
+  .btn-info:hover { background: var(--info); color: #0a1929; border-color: var(--info); }
+
+  /* HERO */
+  .hero {
+    display: grid; grid-template-columns: 1.4fr 1fr;
+    gap: 32px; margin-bottom: 40px; align-items: end;
+  }
+  .hero-title {
+    font-family: var(--serif); font-size: 56px; line-height: 0.95;
+    font-weight: 400; letter-spacing: -0.03em;
+  }
+  .hero-title em { font-style: italic; color: var(--accent); font-weight: 500; }
+  .hero-meta {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+  }
+  .hero-stat { background: var(--panel); padding: 16px 18px; }
+  .hero-stat-label {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-mute);
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;
+  }
+  .hero-stat-value {
+    font-family: var(--serif); font-size: 28px; font-weight: 500; letter-spacing: -0.02em;
+  }
+
+  /* LIVE LEAD ACTION CARD */
+  .action-card {
+    background: linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 48px; margin-bottom: 40px; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .action-card::before {
+    content: ''; position: absolute; left: 0; top: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  }
+  .action-label {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 12px;
+  }
+  .action-title {
+    font-family: var(--serif); font-size: 32px; font-weight: 500;
+    letter-spacing: -0.02em; margin-bottom: 16px;
+  }
+  .action-sub { color: var(--ink-dim); margin-bottom: 32px; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+  .live-lead-btn {
+    background: var(--accent); color: #1a1410; border: none;
+    padding: 24px 64px; font-family: var(--sans); font-size: 18px;
+    font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+    border-radius: 4px; transition: all 0.2s; text-transform: uppercase;
+    box-shadow: 0 4px 24px rgba(217, 119, 6, 0.3); position: relative;
+  }
+  .live-lead-btn:hover {
+    background: var(--accent-2); transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(217, 119, 6, 0.4);
+  }
+  .live-lead-btn:active { transform: translateY(0); }
+  .live-lead-btn:disabled {
+    background: var(--line-2); color: var(--ink-mute); cursor: not-allowed;
+    transform: none; box-shadow: none;
+  }
+  .live-lead-btn::before {
+    content: ''; position: absolute; inset: -4px;
+    border: 2px solid var(--accent); border-radius: 6px;
+    animation: ringPulse 2s infinite; opacity: 0.6; pointer-events: none;
+  }
+  .live-lead-btn:disabled::before { display: none; }
+  @keyframes ringPulse {
+    0% { transform: scale(0.95); opacity: 0.6; }
+    50% { transform: scale(1.05); opacity: 0; }
+    100% { transform: scale(0.95); opacity: 0; }
+  }
+
+  .routing-status {
+    background: var(--panel); border: 1px solid var(--line-2);
+    border-radius: 4px; padding: 24px 32px; margin-top: 24px;
+    display: none; align-items: center; gap: 24px;
+  }
+  .routing-status.show { display: flex; }
+  .routing-status.success { border-color: rgba(132,204,22,0.4); }
+  .routing-status.fail { border-color: rgba(239,68,68,0.4); }
+  .routing-status .spinner {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 3px solid var(--line); border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .routing-status.success .spinner {
+    border: 3px solid var(--good); animation: none;
+    background: var(--good); position: relative;
+  }
+  .routing-status.success .spinner::after {
+    content: '✓'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #0a1410; font-weight: 700; font-size: 20px;
+  }
+  .routing-status.fail .spinner {
+    border: 3px solid var(--bad); animation: none;
+    background: var(--bad); position: relative;
+  }
+  .routing-status.fail .spinner::after {
+    content: '×'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 22px;
+  }
+  .routing-status .text { flex: 1; }
+  .routing-status .text strong {
+    font-family: var(--serif); font-size: 22px; font-weight: 500;
+    display: block; margin-bottom: 4px;
+  }
+  .routing-status .text span { color: var(--ink-dim); font-size: 13px; }
+
+  /* SECTION */
+  .section-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 14px;
+  }
+  .section-title { font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
+  .section-sub { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* ROSTER */
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .agent-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; padding: 20px; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .agent-card.next {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(217, 119, 6, 0.15);
+  }
+  .agent-card.next::after {
+    content: 'NEXT'; position: absolute; top: 0; right: 0;
+    background: var(--accent); color: #1a1410;
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    letter-spacing: 0.1em; padding: 4px 10px;
+  }
+  .agent-card.busy { opacity: 0.85; }
+  .agent-card.offline { opacity: 0.55; }
+
+  .agent-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .agent-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--info), #0ea5e9);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 16px; font-weight: 600;
+    color: #0a1929; flex-shrink: 0;
+  }
+  .agent-card.busy .agent-avatar { background: linear-gradient(135deg, var(--busy), #d97706); color: #1a1410; }
+  .agent-card.offline .agent-avatar { background: linear-gradient(135deg, var(--line-2), var(--line)); color: var(--ink-mute); }
+
+  .agent-name { font-family: var(--serif); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+  .agent-status { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--good); }
+  .agent-card.busy .agent-status { color: var(--busy); }
+  .agent-card.offline .agent-status { color: var(--ink-mute); }
+
+  .agent-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px; background: var(--line); margin-bottom: 16px; border: 1px solid var(--line);
+  }
+  .agent-stat { background: var(--panel-2); padding: 10px; text-align: center; }
+  .agent-stat-label { font-family: var(--mono); font-size: 9px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
+  .agent-stat-value { font-family: var(--serif); font-size: 20px; font-weight: 500; }
+
+  /* PC STATUS */
+  .pc-status-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 28px 32px; margin-bottom: 32px;
+    display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;
+  }
+  .pc-status-card .status-display { display: flex; align-items: center; gap: 16px; }
+  .status-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(132,204,22,0.15); border: 2px solid var(--good);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .status-icon.busy { background: rgba(245,158,11,0.15); border-color: var(--busy); }
+  .status-label { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }
+  .status-value { font-family: var(--serif); font-size: 28px; font-weight: 500; }
+  .status-value.available { color: var(--good); }
+  .status-value.busy { color: var(--busy); }
+
+  .toggle-status-btn {
+    padding: 16px 32px; font-family: var(--sans); font-size: 14px;
+    font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+    border-radius: 4px; transition: all 0.15s; text-transform: uppercase;
+    border: 2px solid; background: transparent;
+  }
+  .toggle-status-btn.to-busy { border-color: var(--busy); color: var(--busy); }
+  .toggle-status-btn.to-busy:hover { background: var(--busy); color: #1a1410; }
+  .toggle-status-btn.to-available { border-color: var(--good); color: var(--good); }
+  .toggle-status-btn.to-available:hover { background: var(--good); color: #0a1410; }
+
+  /* INCOMING POPUP */
+  .incoming-overlay {
+    position: fixed; inset: 0;
+    background: rgba(14, 13, 11, 0.92);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000;
+    animation: incomingFade 0.3s ease;
+  }
+  .incoming-overlay.show { display: flex; }
+  @keyframes incomingFade { from { opacity: 0; } to { opacity: 1; } }
+
+  .incoming-modal {
+    background: var(--panel); border: 2px solid var(--accent);
+    border-radius: 8px; padding: 48px; max-width: 520px; width: 90%;
+    text-align: center;
+    box-shadow: 0 0 0 1px var(--accent), 0 20px 80px rgba(217,119,6,0.3);
+    animation: incomingPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative; overflow: hidden;
+  }
+  @keyframes incomingPop {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .incoming-pulse {
+    position: absolute; left: 0; right: 0; top: 0; height: 4px;
+    background: var(--accent); transform-origin: left;
+  }
+
+  .incoming-label {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 16px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .incoming-label::before, .incoming-label::after {
+    content: ''; width: 24px; height: 1px; background: var(--accent);
+  }
+
+  .incoming-title { font-family: var(--serif); font-size: 48px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; margin-bottom: 12px; }
+  .incoming-sub { color: var(--ink-dim); font-size: 14px; margin-bottom: 8px; }
+  .incoming-from { font-family: var(--mono); font-size: 12px; color: var(--ink); margin-bottom: 32px; }
+  .incoming-from strong { color: var(--accent); }
+
+  .incoming-countdown {
+    font-family: var(--serif); font-size: 96px; font-weight: 500;
+    color: var(--accent); line-height: 1; margin-bottom: 24px;
+    font-feature-settings: 'tnum';
+  }
+
+  .incoming-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .incoming-btn {
+    padding: 20px; font-family: var(--sans); font-size: 16px;
+    font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+    border-radius: 4px; transition: all 0.15s; text-transform: uppercase;
+    border: 2px solid;
+  }
+  .incoming-btn.accept { background: var(--good); color: #0a1410; border-color: var(--good); }
+  .incoming-btn.accept:hover { background: #a3e635; transform: translateY(-2px); }
+  .incoming-btn.deny { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .incoming-btn.deny:hover { background: var(--bad); color: white; }
+
+  /* INSIGHTS */
+  .insights-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 40px;
+  }
+  .kpi { background: var(--panel); border: 1px solid var(--line); padding: 24px; border-radius: 4px; }
+  .kpi-label { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; }
+  .kpi-value { font-family: var(--serif); font-size: 40px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--ink-dim); margin-top: 8px; }
+
+  .insights-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+  @media (max-width: 1100px) { .insights-row { grid-template-columns: 1fr; } }
+
+  .insights-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; padding: 24px;
+  }
+  .insights-card h4 {
+    font-family: var(--serif); font-size: 18px; font-weight: 500; margin-bottom: 4px;
+  }
+  .insights-card p {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-mute);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;
+  }
+
+  .leaderboard {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; overflow: hidden; margin-bottom: 40px;
+  }
+  .leader-row {
+    display: grid; grid-template-columns: 60px 1fr 100px 1fr 100px 100px;
+    align-items: center; padding: 14px 24px;
+    border-bottom: 1px solid var(--line); gap: 16px;
+  }
+  .leader-row:last-child { border-bottom: none; }
+  .leader-row.head {
+    background: var(--panel-2); font-family: var(--mono);
+    font-size: 10px; color: var(--ink-mute);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .leader-rank { font-family: var(--serif); font-size: 28px; font-style: italic; color: var(--ink-mute); font-weight: 400; }
+  .leader-rank.top { color: var(--accent); }
+  .leader-name { font-family: var(--serif); font-size: 17px; font-weight: 500; }
+  .leader-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .leader-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.4s ease; }
+  .leader-num { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+
+  /* MATRIX */
+  .matrix-wrap { overflow-x: auto; margin-top: 16px; }
+  .matrix {
+    border-collapse: collapse; font-family: var(--mono); font-size: 12px;
+    width: 100%; min-width: 600px;
+  }
+  .matrix th, .matrix td {
+    padding: 8px 10px; text-align: center; border: 1px solid var(--line);
+  }
+  .matrix th {
+    background: var(--panel-2); color: var(--ink-mute);
+    font-weight: 500; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .matrix th.row-head, .matrix td.row-head {
+    text-align: left; font-family: var(--serif); font-size: 13px;
+    color: var(--ink); background: var(--panel-2);
+  }
+  .matrix td { color: var(--ink); }
+  .matrix td.zero { color: var(--ink-mute); }
+  .matrix td.heat-1 { background: rgba(217,119,6,0.08); }
+  .matrix td.heat-2 { background: rgba(217,119,6,0.18); }
+  .matrix td.heat-3 { background: rgba(217,119,6,0.32); }
+  .matrix td.heat-4 { background: rgba(217,119,6,0.5); color: white; font-weight: 500; }
+
+  /* HEATMAP (hour-of-day) */
+  .heat-grid {
+    display: grid; grid-template-columns: 32px repeat(24, 1fr);
+    gap: 2px; font-family: var(--mono); font-size: 9px;
+  }
+  .heat-grid .heat-label {
+    color: var(--ink-mute); display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 6px;
+  }
+  .heat-cell {
+    aspect-ratio: 1; border-radius: 2px; background: var(--bg);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: transparent;
+  }
+  .heat-cell:hover { color: var(--ink); }
+
+  /* ACTIVITY */
+  .feed { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .feed-row {
+    display: grid; grid-template-columns: 110px 1fr 160px 160px 100px;
+    gap: 16px; padding: 14px 20px;
+    border-bottom: 1px solid var(--line); align-items: center;
+    transition: background 0.15s;
+  }
+  .feed-row:last-child { border-bottom: none; }
+  .feed-row:hover { background: var(--panel-2); }
+  .feed-row.head { background: var(--panel-2); font-family: var(--mono); font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.12em; }
+  .feed-time { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); }
+  .feed-name { font-family: var(--serif); font-size: 15px; font-weight: 500; }
+  .feed-tag {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 4px 8px; border-radius: 2px; display: inline-block; width: fit-content;
+  }
+  .tag-accepted { background: rgba(132,204,22,0.15); color: var(--good); }
+  .tag-denied { background: rgba(239,68,68,0.15); color: var(--bad); }
+  .tag-timeout { background: rgba(245,158,11,0.15); color: var(--busy); }
+  .tag-info { background: rgba(56,189,248,0.15); color: var(--info); }
+  .tag-neutral { background: rgba(122,112,101,0.15); color: var(--ink-mute); }
+
+  .empty-state {
+    padding: 60px 20px; text-align: center; color: var(--ink-mute);
+    font-family: var(--serif); font-style: italic; font-size: 16px;
+  }
+
+  /* CONFIG / USERS */
+  .config-section { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 32px; margin-bottom: 24px; }
+  .config-section h3 { font-family: var(--serif); font-size: 22px; font-weight: 500; margin-bottom: 8px; }
+  .config-section p { color: var(--ink-dim); margin-bottom: 24px; font-size: 13px; }
+
+  .form-row {
+    display: grid; grid-template-columns: 200px 1fr;
+    gap: 16px; align-items: center; margin-bottom: 16px;
+  }
+  .form-row label { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .users-table { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .users-row {
+    display: grid; grid-template-columns: 1.5fr 100px 100px 1fr;
+    gap: 12px; padding: 12px 16px;
+    border-bottom: 1px solid var(--line); align-items: center;
+  }
+  .users-row:last-child { border-bottom: none; }
+  .users-row.head { background: var(--panel-2); font-family: var(--mono); font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.1em; }
+  .role-pill {
+    font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 2px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    display: inline-block; width: fit-content;
+  }
+  .role-cc { background: rgba(217,119,6,0.15); color: var(--accent); }
+  .role-pc { background: rgba(56,189,248,0.15); color: var(--info); }
+  .role-admin { background: rgba(132,204,22,0.15); color: var(--good); }
+
+  .lock-pill {
+    font-family: var(--mono); font-size: 9px; color: var(--bad);
+    padding: 3px 8px; border-radius: 2px; background: rgba(239,68,68,0.15);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  .code-block {
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 16px; border-radius: 3px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--ink-dim); white-space: pre-wrap;
+    overflow-x: auto; line-height: 1.6;
+  }
+
+  /* TOAST + MODAL */
+  .toast {
+    position: fixed; bottom: 32px; right: 32px;
+    background: var(--panel); border: 1px solid var(--line-2);
+    border-left: 3px solid var(--accent); padding: 14px 20px;
+    border-radius: 3px; font-size: 13px;
+    transform: translateX(120%); transition: transform 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 200; max-width: 360px;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.success { border-left-color: var(--good); }
+  .toast.error { border-left-color: var(--bad); }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 500; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--line-2); border-radius: 4px; padding: 32px; max-width: 480px; width: 90%; }
+  .modal h3 { font-family: var(--serif); font-size: 24px; font-weight: 500; margin-bottom: 12px; }
+  .modal p { color: var(--ink-dim); margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .header-inner { grid-template-columns: 1fr; gap: 16px; padding: 14px 16px; }
+    nav.tabs { justify-self: start; flex-wrap: wrap; }
+    .header-status { justify-self: start; }
+    .hero { grid-template-columns: 1fr; gap: 24px; }
+    .hero-title { font-size: 36px; }
+    .insights-grid { grid-template-columns: repeat(2, 1fr); }
+    .feed-row { grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+    .feed-row.head { display: none; }
+    .leader-row { grid-template-columns: 40px 1fr 80px; }
+    .leader-row .leader-bar-cell, .leader-row .leader-num-today, .leader-row .leader-num-rate { display: none; }
+    main { padding: 24px 16px 60px; }
+    .pc-status-card { grid-template-columns: 1fr; gap: 16px; }
+    .action-card { padding: 32px 20px; }
+    .action-title { font-size: 24px; }
+    .live-lead-btn { padding: 18px 32px; font-size: 16px; width: 100%; }
+    .incoming-modal { padding: 32px 24px; }
+    .incoming-title { font-size: 32px; }
+    .incoming-countdown { font-size: 64px; }
+    .users-row { grid-template-columns: 1fr 60px; gap: 6px; font-size: 12px; }
+    .users-row .users-role-cell, .users-row .users-status-cell { display: none; }
+    .form-row { grid-template-columns: 1fr; gap: 4px; }
+    .pin-display { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== LOGIN SCREEN ============== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">Relay</div>
+    <div class="login-tag">Lead Handover · Sign In</div>
+
+    <div id="firebaseSetupNotice" style="display:none;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);padding:12px 14px;border-radius:3px;font-size:12px;color:#fbbf24;margin-bottom:24px">
+      Firebase isn't configured yet. <a href="#" id="goToSetup" style="color:#fbbf24;text-decoration:underline">Set it up →</a>
+    </div>
+
+    <div id="firstAdminNotice" style="display:none;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:12px 14px;border-radius:3px;font-size:12px;color:#7dd3fc;margin-bottom:24px">
+      No users yet. <a href="#" id="goToFirstAdmin" style="color:#7dd3fc;text-decoration:underline">Create the first admin →</a>
+    </div>
+
+    <h2 class="login-title">Welcome back</h2>
+    <p class="login-sub">Pick your name and enter your PIN</p>
+
+    <div class="login-msg" id="loginMsg"></div>
+
+    <div class="form-group">
+      <label>Your Name</label>
+      <select class="input" id="loginUserSelect">
+        <option value="">— Select your name —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>4-Digit PIN</label>
+      <div class="pin-display" id="pinDisplay">
+        <div class="pin-cell"></div>
+        <div class="pin-cell"></div>
+        <div class="pin-cell"></div>
+        <div class="pin-cell"></div>
+      </div>
+    </div>
+
+    <div class="pin-pad" id="pinPad">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key action" data-key="clear">Clear</button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key action" data-key="back">⌫</button>
+    </div>
+
+    <div style="margin-top:24px;text-align:center;font-size:12px;color:var(--ink-mute)">
+      <a href="#" id="firebaseConfigLink" style="color:var(--ink-mute);text-decoration:underline">Configure Firebase</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FIRST ADMIN SCREEN ============== -->
+<div id="firstAdminScreen" class="login-screen" style="display:none">
+  <div class="login-card" style="max-width:480px">
+    <div class="login-brand">Relay</div>
+    <div class="login-tag">First-time setup · Create admin</div>
+
+    <h2 class="login-title">Create the first admin</h2>
+    <p class="login-sub">This is a one-time setup. After this, only admins can create new users.</p>
+
+    <div class="login-msg" id="firstAdminMsg"></div>
+
+    <div class="form-group">
+      <label>Your Name</label>
+      <input class="input" id="firstAdminName" placeholder="e.g. Alex Morgan" />
+    </div>
+
+    <div class="form-group">
+      <label>Set a 4-digit PIN</label>
+      <input class="input" id="firstAdminPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+    </div>
+
+    <div class="form-group">
+      <label>Confirm PIN</label>
+      <input class="input" id="firstAdminPin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+    </div>
+
+    <button class="btn-primary" id="firstAdminCreate">Create Admin Account</button>
+    <div style="margin-top:16px;text-align:center;font-size:12px">
+      <a href="#" id="firstAdminBack" style="color:var(--ink-mute);text-decoration:underline">← Back</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FIREBASE SETUP SCREEN ============== -->
+<div id="setupScreen" class="login-screen" style="display:none">
+  <div class="login-card" style="max-width:560px">
+    <div class="login-brand">Relay</div>
+    <div class="login-tag">Firebase Setup</div>
+
+    <h2 class="login-title">Connect to Firebase</h2>
+    <p class="login-sub">Paste your Firebase project credentials. See the README for step-by-step instructions.</p>
+
+    <div class="login-msg" id="setupMsg"></div>
+
+    <div class="form-group"><label>API Key</label><input class="input" id="setupApiKey" /></div>
+    <div class="form-group"><label>Database URL</label><input class="input" id="setupDbUrl" placeholder="https://your-project-default-rtdb.firebaseio.com" /></div>
+    <div class="form-group"><label>Project ID</label><input class="input" id="setupProjectId" /></div>
+    <div class="form-group"><label>App ID (optional)</label><input class="input" id="setupAppId" /></div>
+
+    <button class="btn-primary" id="setupSave">Save & Continue</button>
+    <div style="margin-top:16px;text-align:center;font-size:12px">
+      <a href="#" id="setupBack" style="color:var(--ink-mute);text-decoration:underline">← Back</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FORCE PIN CHANGE SCREEN ============== -->
+<div id="pinChangeScreen" class="login-screen" style="display:none">
+  <div class="login-card" style="max-width:440px">
+    <div class="login-brand">Relay</div>
+    <div class="login-tag">Set Your PIN</div>
+
+    <h2 class="login-title">Choose a new PIN</h2>
+    <p class="login-sub" id="pinChangeSub">For security, please change the default PIN before continuing.</p>
+
+    <div class="login-msg" id="pinChangeMsg"></div>
+
+    <div class="form-group"><label>New PIN (4 digits)</label><input class="input" id="newPin1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="new-password" /></div>
+    <div class="form-group"><label>Confirm PIN</label><input class="input" id="newPin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="new-password" /></div>
+
+    <button class="btn-primary" id="newPinSave">Save PIN & Continue</button>
+  </div>
+</div>
+
+<!-- ============== APP SHELL ============== -->
+<div id="appShell" style="display:none">
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">Relay</span>
+      <span class="brand-sub" id="brandSub">Lead Handover</span>
+    </div>
+    <nav class="tabs" id="navTabs"></nav>
+    <div class="header-status">
+      <span class="live-dot" id="liveDot"></span>
+      <div class="user-chip">
+        <div class="user-avatar" id="userAvatar">??</div>
+        <div class="user-info">
+          <span class="user-name" id="userName">—</span>
+          <span class="user-role" id="userRole">—</span>
+        </div>
+      </div>
+      <button class="btn-link" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <!-- VIEW-AS BAR (admin only) -->
+  <div class="view-as-bar" id="viewAsBar">
+    <strong>Admin View As</strong>
+    <div class="view-as-options" id="viewAsOptions">
+      <button class="active" data-view="admin">Admin</button>
+      <button data-view="cc">Customer Consultant</button>
+      <button data-view="pc">Protection Consultant</button>
+    </div>
+    <span style="color:var(--ink-mute)">Switch perspective without leaving admin privileges</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============== CC DASHBOARD ============== -->
+  <section class="page" id="page-cc-dashboard">
+    <div class="hero">
+      <h1 class="hero-title">Hand off leads, <em>instantly.</em></h1>
+      <div class="hero-meta">
+        <div class="hero-stat"><div class="hero-stat-label">Your Leads Today</div><div class="hero-stat-value" id="ccStatYou">0</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">PCs Available</div><div class="hero-stat-value" id="ccStatAvailable">0</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">Total Today</div><div class="hero-stat-value" id="ccStatTotal">0</div></div>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="action-label">▸ When a client is on the phone</div>
+      <h2 class="action-title">Press the button to route a live lead</h2>
+      <p class="action-sub">The next available Protection Consultant will get a 10-second window to accept. If they deny or don't respond, it rolls automatically to the next person.</p>
+      <button class="live-lead-btn" id="liveLeadBtn">▶ Live Lead</button>
+
+      <div class="routing-status" id="ccRoutingStatus">
+        <div class="spinner"></div>
+        <div class="text">
+          <strong id="ccRoutingTitle">Routing…</strong>
+          <span id="ccRoutingDetail">Finding next available consultant</span>
+        </div>
+        <button class="btn btn-bad" id="ccCancelLead" style="display:none">Cancel</button>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2 class="section-title">Protection Consultants</h2>
+      <span class="section-sub" id="ccPcCount">— consultants</span>
+    </div>
+    <div class="roster" id="ccRoster"></div>
+  </section>
+
+  <!-- ============== PC DASHBOARD ============== -->
+  <section class="page" id="page-pc-dashboard">
+    <div class="hero">
+      <h1 class="hero-title">Standing by, <em id="pcGreeting">ready.</em></h1>
+      <div class="hero-meta">
+        <div class="hero-stat"><div class="hero-stat-label">Today</div><div class="hero-stat-value" id="pcStatToday">0</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">All-Time</div><div class="hero-stat-value" id="pcStatTotal">0</div></div>
+        <div class="hero-stat"><div class="hero-stat-label">Acceptance</div><div class="hero-stat-value" id="pcStatAcceptance">—</div></div>
+      </div>
+    </div>
+
+    <div class="pc-status-card">
+      <div class="status-display">
+        <div class="status-icon" id="pcStatusIcon">●</div>
+        <div>
+          <div class="status-label">Your Status</div>
+          <div class="status-value available" id="pcStatusValue">Available</div>
+        </div>
+      </div>
+      <button class="toggle-status-btn to-busy" id="pcToggleStatus">Set Busy</button>
+    </div>
+
+    <div class="section-head">
+      <h2 class="section-title">Your Recent Leads</h2>
+      <span class="section-sub">Last 20 events</span>
+    </div>
+    <div class="feed" id="pcFeed"></div>
+  </section>
+
+  <!-- ============== INSIGHTS ============== -->
+  <section class="page" id="page-insights">
+    <div class="section-head" style="margin-top:0">
+      <h2 class="section-title" id="insightsTitle">Performance Insights</h2>
+      <span class="section-sub" id="insightsScope">All-time</span>
+    </div>
+
+    <div class="insights-grid" id="kpiGrid"></div>
+
+    <div id="adminInsightsBlock">
+      <div class="section-head">
+        <h2 class="section-title">PC Leaderboard</h2>
+        <span class="section-sub">Volume, today, acceptance rate</span>
+      </div>
+      <div class="leaderboard">
+        <div class="leader-row head">
+          <span>#</span><span>Consultant</span>
+          <span class="leader-num-today">Today</span>
+          <span class="leader-bar-cell">Volume</span>
+          <span class="leader-num-rate">Accept %</span>
+          <span>Total</span>
+        </div>
+        <div id="leaderboardBody"></div>
+      </div>
+
+      <div class="section-head">
+        <h2 class="section-title">CC Leaderboard</h2>
+        <span class="section-sub">Who hands off the most</span>
+      </div>
+      <div class="leaderboard">
+        <div class="leader-row head">
+          <span>#</span><span>Consultant</span>
+          <span class="leader-num-today">Today</span>
+          <span class="leader-bar-cell">Volume</span>
+          <span class="leader-num-rate">Success %</span>
+          <span>Total</span>
+        </div>
+        <div id="ccLeaderboardBody"></div>
+      </div>
+
+      <div class="insights-row">
+        <div class="insights-card">
+          <h4>Handover Matrix</h4>
+          <p>Rows are CCs, columns are PCs · cell = number of successful handovers</p>
+          <div class="matrix-wrap" id="matrixWrap"></div>
+        </div>
+        <div class="insights-card">
+          <h4>Top Pairings</h4>
+          <p>Most frequent CC → PC handover combos</p>
+          <div id="topPairings"></div>
+        </div>
+      </div>
+
+      <div class="insights-row">
+        <div class="insights-card">
+          <h4>Daily Throughput</h4>
+          <p>Last 14 days</p>
+          <svg id="chart" viewBox="0 0 800 200" style="width:100%;height:200px"></svg>
+        </div>
+        <div class="insights-card">
+          <h4>Hour-of-Day Heatmap</h4>
+          <p>When leads are coming in (last 30 days)</p>
+          <div id="heatmap"></div>
+        </div>
+      </div>
+
+      <div class="insights-row">
+        <div class="insights-card">
+          <h4>Response Times</h4>
+          <p>Avg seconds to accept · per PC</p>
+          <div id="responseTimes"></div>
+        </div>
+        <div class="insights-card">
+          <h4>Reliability</h4>
+          <p>Denies + timeouts · per PC</p>
+          <div id="reliability"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== ACTIVITY ============== -->
+  <section class="page" id="page-activity">
+    <div class="section-head" style="margin-top:0">
+      <h2 class="section-title">Activity Feed</h2>
+      <span class="section-sub">Last 100 events</span>
+    </div>
+    <div class="feed">
+      <div class="feed-row head"><span>Time</span><span>Event</span><span>From CC</span><span>To PC</span><span>Result</span></div>
+      <div id="activityBody"></div>
+    </div>
+  </section>
+
+  <!-- ============== USERS (admin) ============== -->
+  <section class="page" id="page-users">
+    <div class="section-head" style="margin-top:0">
+      <h2 class="section-title">User Management</h2>
+      <span class="section-sub" id="usersCount">— users</span>
+    </div>
+
+    <div class="config-section">
+      <h3>Add Team Member</h3>
+      <p>New users get the default PIN <code style="font-family:var(--mono);color:var(--accent)">0000</code> and will be forced to change it on first login.</p>
+
+      <div class="form-row"><label>Display Name</label><input class="input" id="newUserName" placeholder="Sarah Johnson" /></div>
+      <div class="form-row"><label>Role</label>
+        <select class="input" id="newUserRole">
+          <option value="cc">Customer Consultant (CC)</option>
+          <option value="pc">Protection Consultant (PC)</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <button class="btn btn-good" id="addUserBtn" style="margin-top:8px">＋ Create User</button>
+    </div>
+
+    <div class="config-section">
+      <h3>Team Roster</h3>
+      <div class="users-table">
+        <div class="users-row head">
+          <span>Name</span>
+          <span class="users-role-cell">Role</span>
+          <span class="users-status-cell">Status</span>
+          <span style="text-align:right">Actions</span>
+        </div>
+        <div id="usersBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== CONFIG ============== -->
+  <section class="page" id="page-config">
+    <div class="config-section">
+      <h3>Firebase Configuration</h3>
+      <p>Currently connected to <code id="cfgCurrentProject" style="font-family:var(--mono);color:var(--accent)">—</code>. To change projects, sign out and reconfigure.</p>
+      <button class="btn" id="cfgReconfigure">Reconfigure Firebase</button>
+    </div>
+
+    <div class="config-section">
+      <h3>System Behaviour</h3>
+      <p>Tune how the round-robin handles leads.</p>
+      <div class="form-row"><label>Accept Window (sec)</label><input class="input" id="cfgTimeout" type="number" min="5" max="60" value="10" /></div>
+      <button class="btn btn-good" id="cfgSaveSettings">Save Settings</button>
+    </div>
+
+    <div class="config-section">
+      <h3>Your PIN</h3>
+      <p>Change your own PIN at any time.</p>
+      <div class="form-row"><label>Current PIN</label><input class="input" id="myCurrentPin" type="password" inputmode="numeric" maxlength="4" /></div>
+      <div class="form-row"><label>New PIN</label><input class="input" id="myNewPin" type="password" inputmode="numeric" maxlength="4" /></div>
+      <div class="form-row"><label>Confirm New PIN</label><input class="input" id="myNewPin2" type="password" inputmode="numeric" maxlength="4" /></div>
+      <button class="btn btn-good" id="changePinBtn">Update PIN</button>
+    </div>
+
+    <div class="config-section">
+      <h3>Database Security Rules</h3>
+      <p>Use these rules to protect your Realtime Database. Note: this app does not use Firebase Auth — it uses PIN auth handled in-app, so the database itself must be readable. PIN hashes are stored, not plaintext.</p>
+      <div class="code-block">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</div>
+      <p style="margin-top:12px;font-size:12px;color:var(--busy)">⚠ Anyone with your database URL could read or write. For internal use, keep the URL private. For higher security, see README on adding Firebase App Check or migrating to email-auth.</p>
+    </div>
+
+    <div class="config-section">
+      <h3>Export Data</h3>
+      <p>Download all routing history and team data as JSON.</p>
+      <button class="btn" id="exportBtn">Export JSON</button>
+    </div>
+
+    <div class="config-section" style="border-color:rgba(239,68,68,0.3)">
+      <h3 style="color:var(--bad)">Danger Zone</h3>
+      <p>Irreversible actions.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-warn" id="resetCounts">Reset All Counts</button>
+        <button class="btn btn-warn" id="resetEvents">Clear Activity Feed</button>
+        <button class="btn btn-warn" id="resetRotation">Reset Rotation Pointer</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<!-- ============== INCOMING POPUP (PC) ============== -->
+<div class="incoming-overlay" id="incomingOverlay">
+  <div class="incoming-modal">
+    <div class="incoming-pulse" id="incomingPulse"></div>
+    <div class="incoming-label">Incoming Lead</div>
+    <h2 class="incoming-title">New Live Lead</h2>
+    <p class="incoming-sub">A customer is on the line and ready for handover</p>
+    <p class="incoming-from">From: <strong id="incomingFromName">—</strong></p>
+    <div class="incoming-countdown" id="incomingCountdown">10</div>
+    <div class="incoming-actions">
+      <button class="incoming-btn deny" id="denyBtn">Deny</button>
+      <button class="incoming-btn accept" id="acceptBtn">Accept</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Confirm</h3>
+    <p id="modalText">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn btn-warn" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================
+// RELAY v3 — PIN Auth · Multi-role · Cross-insights
+// ============================================================
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, set, update, get, remove, runTransaction, off, onDisconnect }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// CONSTANTS
+const LS_CFG = 'relay_firebase_cfg';
+const LS_SESSION = 'relay_session_uid';
+const ACCEPT_TIMEOUT_DEFAULT = 10;
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_WINDOW_MS = 5 * 60 * 1000;
+const LOCKOUT_DURATION_MS = 10 * 60 * 1000;
+
+// STATE
+let firebaseApp = null;
+let db = null;
+let currentUser = null;     // { uid, name, role, ... }
+let usersMap = {};
+let settings = { acceptTimeout: ACCEPT_TIMEOUT_DEFAULT };
+let rotationPointer = 0;
+let activeLead = null;
+let incomingLead = null;
+let events = [];
+let unsubscribers = [];
+
+// PIN entry buffer
+let pinBuffer = '';
+
+// View-as (admin)
+let viewAs = 'admin';
+
+// ============================================================
+// PIN HASHING
+// ============================================================
+async function hashPin(pin, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + ':' + pin);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function makeSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return [...arr].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+function boot() {
+  bindLoginUI();
+  bindFirstAdminUI();
+  bindSetupUI();
+  bindPinChangeUI();
+  bindAppShellUI();
+
+  const cfg = loadCfg();
+  if (!cfg) {
+    showLoginScreen();
+    document.getElementById('firebaseSetupNotice').style.display = 'block';
+    return;
+  }
+
+  initFirebase(cfg);
+}
+
+function loadCfg() {
+  try { return JSON.parse(localStorage.getItem(LS_CFG) || 'null'); } catch { return null; }
+}
+function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
+
+function initFirebase(cfg) {
+  try {
+    firebaseApp = initializeApp({
+      apiKey: cfg.apiKey,
+      authDomain: cfg.authDomain || `${cfg.projectId}.firebaseapp.com`,
+      databaseURL: cfg.databaseURL,
+      projectId: cfg.projectId,
+      appId: cfg.appId,
+    });
+    db = getDatabase(firebaseApp);
+
+    // Check if any users exist
+    get(ref(db, 'users')).then(snap => {
+      const hasUsers = snap.exists() && Object.keys(snap.val() || {}).length > 0;
+      if (!hasUsers) {
+        document.getElementById('firstAdminNotice').style.display = 'block';
+      }
+      // Try resuming session
+      const sessionUid = localStorage.getItem(LS_SESSION);
+      if (sessionUid && hasUsers) {
+        const u = (snap.val() || {})[sessionUid];
+        if (u) {
+          currentUser = u;
+          afterSignIn(u);
+          return;
+        }
+      }
+      showLoginScreen();
+      populateUserSelect();
+    }).catch(err => {
+      console.error(err);
+      showLoginMsg('Database error: ' + err.message, 'error');
+      showLoginScreen();
+    });
+  } catch (e) {
+    console.error(e);
+    showLoginMsg('Failed to initialize Firebase: ' + e.message, 'error');
+    showLoginScreen();
+  }
+}
+
+// ============================================================
+// LOGIN: PIN ENTRY
+// ============================================================
+function bindLoginUI() {
+  // Populate user select once we have data — we also re-populate on user changes
+  const select = document.getElementById('loginUserSelect');
+  select.addEventListener('change', () => {
+    pinBuffer = '';
+    renderPinDisplay();
+    document.getElementById('loginMsg').classList.remove('show');
+  });
+
+  document.getElementById('pinPad').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pin-key');
+    if (!btn) return;
+    const k = btn.dataset.key;
+    if (k === 'clear') { pinBuffer = ''; renderPinDisplay(); return; }
+    if (k === 'back') { pinBuffer = pinBuffer.slice(0, -1); renderPinDisplay(); return; }
+    if (pinBuffer.length < 4) {
+      pinBuffer += k;
+      renderPinDisplay();
+      if (pinBuffer.length === 4) attemptLogin();
+    }
+  });
+
+  // Keyboard support
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('loginScreen').style.display === 'none') return;
+    if (/^[0-9]$/.test(e.key) && pinBuffer.length < 4) {
+      pinBuffer += e.key;
+      renderPinDisplay();
+      if (pinBuffer.length === 4) attemptLogin();
+    } else if (e.key === 'Backspace') {
+      pinBuffer = pinBuffer.slice(0, -1);
+      renderPinDisplay();
+    } else if (e.key === 'Escape') {
+      pinBuffer = '';
+      renderPinDisplay();
+    }
+  });
+
+  document.getElementById('firebaseConfigLink').addEventListener('click', (e) => {
+    e.preventDefault(); showSetupScreen();
+  });
+  document.getElementById('goToSetup').addEventListener('click', (e) => {
+    e.preventDefault(); showSetupScreen();
+  });
+  document.getElementById('goToFirstAdmin').addEventListener('click', (e) => {
+    e.preventDefault(); showFirstAdminScreen();
+  });
+}
+
+function populateUserSelect() {
+  const select = document.getElementById('loginUserSelect');
+  if (!db) return;
+  get(ref(db, 'users')).then(snap => {
+    const users = Object.values(snap.val() || {}).sort((a,b) => a.name.localeCompare(b.name));
+    select.innerHTML = '<option value="">— Select your name —</option>' +
+      users.map(u => `<option value="${u.uid}">${escapeHtml(u.name)} · ${roleLabel(u.role)}</option>`).join('');
+  });
+}
+
+function renderPinDisplay() {
+  const cells = document.querySelectorAll('#pinDisplay .pin-cell');
+  cells.forEach((c, i) => {
+    c.classList.remove('error');
+    if (i < pinBuffer.length) {
+      c.textContent = '•';
+      c.classList.add('filled');
+    } else {
+      c.textContent = '';
+      c.classList.remove('filled');
+    }
+  });
+}
+
+function flashPinError() {
+  document.querySelectorAll('#pinDisplay .pin-cell').forEach(c => {
+    c.classList.remove('filled');
+    c.classList.add('error');
+  });
+  setTimeout(() => {
+    pinBuffer = '';
+    renderPinDisplay();
+  }, 600);
+}
+
+async function attemptLogin() {
+  const uid = document.getElementById('loginUserSelect').value;
+  if (!uid) {
+    showLoginMsg('Please select your name first', 'error');
+    flashPinError();
+    return;
+  }
+
+  const userSnap = await get(ref(db, `users/${uid}`));
+  if (!userSnap.exists()) {
+    showLoginMsg('User not found', 'error');
+    flashPinError();
+    return;
+  }
+  const u = userSnap.val();
+
+  // Check lockout
+  if (u.lockedUntil && Date.now() < u.lockedUntil) {
+    const mins = Math.ceil((u.lockedUntil - Date.now()) / 60000);
+    showLoginMsg(`Account locked. Try again in ${mins} minute${mins !== 1 ? 's' : ''}, or ask an admin to unlock.`, 'error');
+    flashPinError();
+    return;
+  }
+
+  const expected = await hashPin(pinBuffer, u.pinSalt);
+  if (expected !== u.pinHash) {
+    // Record failed attempt
+    const failures = (u.failedAttempts || []).filter(t => Date.now() - t < LOCKOUT_WINDOW_MS);
+    failures.push(Date.now());
+    const updates = { failedAttempts: failures };
+    if (failures.length >= LOCKOUT_THRESHOLD) {
+      updates.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+      updates.failedAttempts = [];
+      showLoginMsg('Too many failed attempts. Account locked for 10 minutes.', 'error');
+    } else {
+      const remaining = LOCKOUT_THRESHOLD - failures.length;
+      showLoginMsg(`Incorrect PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`, 'error');
+    }
+    await update(ref(db, `users/${uid}`), updates);
+    flashPinError();
+    return;
+  }
+
+  // Success — clear failures
+  await update(ref(db, `users/${uid}`), { failedAttempts: [], lockedUntil: null, lastLogin: Date.now() });
+
+  currentUser = u;
+  localStorage.setItem(LS_SESSION, uid);
+
+  // Force PIN change?
+  if (u.mustChangePin) {
+    showPinChangeScreen(true);
+    return;
+  }
+
+  afterSignIn(u);
+}
+
+function showLoginMsg(msg, type = 'error') {
+  const el = document.getElementById('loginMsg');
+  el.textContent = msg;
+  el.className = 'login-msg show ' + type;
+}
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('firstAdminScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('pinChangeScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'none';
+  pinBuffer = '';
+  renderPinDisplay();
+  if (db) populateUserSelect();
+}
+
+function showFirstAdminScreen() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('firstAdminScreen').style.display = 'flex';
+}
+
+function showSetupScreen() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'flex';
+  const cfg = loadCfg();
+  if (cfg) {
+    document.getElementById('setupApiKey').value = cfg.apiKey || '';
+    document.getElementById('setupDbUrl').value = cfg.databaseURL || '';
+    document.getElementById('setupProjectId').value = cfg.projectId || '';
+    document.getElementById('setupAppId').value = cfg.appId || '';
+  }
+}
+
+function showPinChangeScreen(forced) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('pinChangeScreen').style.display = 'flex';
+  document.getElementById('pinChangeSub').textContent = forced
+    ? 'For security, please change the default PIN before continuing.'
+    : 'Choose a new 4-digit PIN.';
+  document.getElementById('newPin1').value = '';
+  document.getElementById('newPin2').value = '';
+  document.getElementById('pinChangeMsg').classList.remove('show');
+}
+
+function showAppShell() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('firstAdminScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('pinChangeScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+}
+
+// ============================================================
+// FIRST ADMIN SETUP
+// ============================================================
+function bindFirstAdminUI() {
+  document.getElementById('firstAdminBack').addEventListener('click', (e) => {
+    e.preventDefault(); showLoginScreen();
+  });
+  document.getElementById('firstAdminCreate').addEventListener('click', async () => {
+    const name = document.getElementById('firstAdminName').value.trim();
+    const pin = document.getElementById('firstAdminPin').value.trim();
+    const pin2 = document.getElementById('firstAdminPin2').value.trim();
+    const msgEl = document.getElementById('firstAdminMsg');
+
+    if (!name) { msgEl.className = 'login-msg show error'; msgEl.textContent = 'Name is required'; return; }
+    if (!/^\d{4}$/.test(pin)) { msgEl.className = 'login-msg show error'; msgEl.textContent = 'PIN must be 4 digits'; return; }
+    if (pin !== pin2) { msgEl.className = 'login-msg show error'; msgEl.textContent = 'PINs do not match'; return; }
+
+    // Check no users yet
+    const snap = await get(ref(db, 'users'));
+    if (snap.exists() && Object.keys(snap.val() || {}).length > 0) {
+      msgEl.className = 'login-msg show error';
+      msgEl.textContent = 'Setup already complete. Ask an admin for an account.';
+      return;
+    }
+
+    const uid = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const salt = makeSalt();
+    const hash = await hashPin(pin, salt);
+    const user = {
+      uid, name, role: 'admin',
+      status: 'available',
+      totalLeads: 0, todayLeads: 0,
+      totalAccepted: 0, totalDenied: 0, totalTimeouts: 0,
+      totalCcLeads: 0, totalCcSuccess: 0,
+      acceptTimes: [],
+      pinHash: hash, pinSalt: salt,
+      mustChangePin: false,
+      createdAt: Date.now(),
+      order: 0,
+      dailyHistory: {},
+      lastDay: todayKey(),
+    };
+    await set(ref(db, `users/${uid}`), user);
+
+    currentUser = user;
+    localStorage.setItem(LS_SESSION, uid);
+    afterSignIn(user);
+  });
+}
+
+// ============================================================
+// FIREBASE SETUP
+// ============================================================
+function bindSetupUI() {
+  document.getElementById('setupBack').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (loadCfg()) showLoginScreen();
+  });
+  document.getElementById('setupSave').addEventListener('click', () => {
+    const cfg = {
+      apiKey: document.getElementById('setupApiKey').value.trim(),
+      databaseURL: document.getElementById('setupDbUrl').value.trim(),
+      projectId: document.getElementById('setupProjectId').value.trim(),
+      appId: document.getElementById('setupAppId').value.trim(),
+    };
+    if (!cfg.apiKey || !cfg.databaseURL || !cfg.projectId) {
+      const m = document.getElementById('setupMsg');
+      m.textContent = 'API Key, Database URL, and Project ID are required';
+      m.className = 'login-msg show error';
+      return;
+    }
+    saveCfg(cfg);
+    location.reload();
+  });
+}
+
+// ============================================================
+// PIN CHANGE
+// ============================================================
+function bindPinChangeUI() {
+  document.getElementById('newPinSave').addEventListener('click', async () => {
+    const p1 = document.getElementById('newPin1').value.trim();
+    const p2 = document.getElementById('newPin2').value.trim();
+    const msgEl = document.getElementById('pinChangeMsg');
+
+    if (!/^\d{4}$/.test(p1)) { msgEl.className = 'login-msg show error'; msgEl.textContent = 'PIN must be 4 digits'; return; }
+    if (p1 !== p2) { msgEl.className = 'login-msg show error'; msgEl.textContent = 'PINs do not match'; return; }
+    if (p1 === '0000') { msgEl.className = 'login-msg show error'; msgEl.textContent = 'Pick a more secure PIN than 0000'; return; }
+    if (p1 === '1234' || p1 === '1111' || p1 === '9999') { msgEl.className = 'login-msg show warn'; msgEl.textContent = 'That\'s a common PIN — try something less obvious'; return; }
+
+    const salt = makeSalt();
+    const hash = await hashPin(p1, salt);
+    await update(ref(db, `users/${currentUser.uid}`), {
+      pinHash: hash, pinSalt: salt, mustChangePin: false,
+    });
+    currentUser.pinHash = hash;
+    currentUser.pinSalt = salt;
+    currentUser.mustChangePin = false;
+    showToast('PIN updated', 'success');
+    afterSignIn(currentUser);
+  });
+}
+
+// ============================================================
+// AFTER SIGN-IN
+// ============================================================
+function afterSignIn(user) {
+  setHeaderForUser(user);
+  buildNavForRole(user.role);
+  subscribeAll();
+
+  // Mark online
+  if (db) {
+    update(ref(db, `users/${user.uid}`), { online: true, lastSeen: Date.now() });
+    onDisconnect(ref(db, `users/${user.uid}/online`)).set(false);
+  }
+
+  // Show view-as bar for admins
+  document.getElementById('viewAsBar').classList.toggle('show', user.role === 'admin');
+  if (user.role === 'admin') {
+    viewAs = 'admin';
+    syncViewAsButtons();
+  }
+
+  showAppShell();
+  showInitialPage(user.role);
+}
+
+function setHeaderForUser(p) {
+  const initials = (p.name || '?').split(/\s+/).slice(0,2).map(s => s[0]||'').join('').toUpperCase();
+  const av = document.getElementById('userAvatar');
+  av.textContent = initials;
+  av.classList.remove('pc', 'admin');
+  if (p.role === 'pc') av.classList.add('pc');
+  if (p.role === 'admin') av.classList.add('admin');
+  document.getElementById('userName').textContent = p.name;
+  document.getElementById('userRole').textContent = roleLabel(p.role);
+  document.getElementById('brandSub').textContent = roleSubtitle(p.role);
+}
+
+function roleLabel(r) {
+  if (r === 'cc') return 'Customer Consultant';
+  if (r === 'pc') return 'Protection Consultant';
+  if (r === 'admin') return 'Admin';
+  return '—';
+}
+function roleSubtitle(r) {
+  if (r === 'cc') return 'CC Console · Live Lead Routing';
+  if (r === 'pc') return 'PC Console · Standby';
+  if (r === 'admin') return 'Admin Console · Full Control';
+  return 'Lead Handover';
+}
+
+function buildNavForRole(role) {
+  const nav = document.getElementById('navTabs');
+  let tabs = [];
+  if (role === 'cc') {
+    tabs = [
+      { id: 'cc-dashboard', label: 'Dashboard' },
+      { id: 'insights', label: 'Insights' },
+      { id: 'activity', label: 'Activity' },
+      { id: 'config', label: 'Settings' },
+    ];
+  } else if (role === 'pc') {
+    tabs = [
+      { id: 'pc-dashboard', label: 'Dashboard' },
+      { id: 'insights', label: 'Insights' },
+      { id: 'activity', label: 'Activity' },
+      { id: 'config', label: 'Settings' },
+    ];
+  } else if (role === 'admin') {
+    tabs = [
+      { id: 'cc-dashboard', label: 'CC Dashboard' },
+      { id: 'pc-dashboard', label: 'PC Dashboard' },
+      { id: 'insights', label: 'Insights' },
+      { id: 'activity', label: 'Activity' },
+      { id: 'users', label: 'Users' },
+      { id: 'config', label: 'Configuration' },
+    ];
+  }
+  nav.innerHTML = tabs.map((t,i) => `<button class="tab ${i===0?'active':''}" data-page="${t.id}">${t.label}</button>`).join('');
+  nav.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nav.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      showPage(btn.dataset.page);
+    });
+  });
+}
+
+function showInitialPage(role) {
+  if (role === 'cc') showPage('cc-dashboard');
+  else if (role === 'pc') showPage('pc-dashboard');
+  else showPage('cc-dashboard');
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (id === 'insights') renderInsights();
+  if (id === 'activity') renderActivity();
+  if (id === 'users') renderUsers();
+}
+
+// ============================================================
+// VIEW-AS (admin)
+// ============================================================
+function syncViewAsButtons() {
+  document.querySelectorAll('#viewAsOptions button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === viewAs);
+  });
+}
+
+// ============================================================
+// SUBSCRIPTIONS
+// ============================================================
+function subscribeAll() {
+  cleanupSubscriptions();
+
+  const usersRef = ref(db, 'users');
+  onValue(usersRef, (snap) => {
+    usersMap = snap.val() || {};
+    if (currentUser && usersMap[currentUser.uid]) {
+      currentUser = usersMap[currentUser.uid];
+      setHeaderForUser(currentUser);
+    }
+    setLive(true);
+    renderAll();
+  }, (err) => { console.error(err); setLive(false); });
+  unsubscribers.push(() => off(usersRef));
+
+  const settingsRef = ref(db, 'settings');
+  onValue(settingsRef, (snap) => {
+    if (snap.exists()) settings = { acceptTimeout: ACCEPT_TIMEOUT_DEFAULT, ...snap.val() };
+    const tEl = document.getElementById('cfgTimeout');
+    if (tEl) tEl.value = settings.acceptTimeout;
+  });
+  unsubscribers.push(() => off(settingsRef));
+
+  const rotRef = ref(db, 'rotation/pointer');
+  onValue(rotRef, (snap) => { rotationPointer = snap.val() || 0; renderAll(); });
+  unsubscribers.push(() => off(rotRef));
+
+  const evRef = ref(db, 'events');
+  onValue(evRef, (snap) => {
+    const v = snap.val() || {};
+    events = Object.values(v).sort((a,b) => b.time - a.time).slice(0, 200);
+    renderActivity();
+    renderInsights();
+    renderPCFeed();
+  });
+  unsubscribers.push(() => off(evRef));
+
+  const leadsRef = ref(db, 'activeLeads');
+  onValue(leadsRef, (snap) => {
+    const leads = snap.val() || {};
+    handleActiveLeads(leads);
+  });
+  unsubscribers.push(() => off(leadsRef));
+}
+
+function cleanupSubscriptions() {
+  unsubscribers.forEach(u => { try { u(); } catch {} });
+  unsubscribers = [];
+}
+
+function setLive(on) { document.getElementById('liveDot').classList.toggle('offline', !on); }
+
+// ============================================================
+// EFFECTIVE ROLE (for view-as)
+// ============================================================
+function effectiveRole() {
+  if (!currentUser) return null;
+  if (currentUser.role === 'admin' && viewAs !== 'admin') return viewAs;
+  return currentUser.role;
+}
+function isCC() { const r = effectiveRole(); return r === 'cc' || currentUser?.role === 'admin'; }
+function isPC() { const r = effectiveRole(); return r === 'pc' || currentUser?.role === 'admin'; }
+
+// ============================================================
+// CC FLOW: Live Lead
+// ============================================================
+async function triggerLiveLead() {
+  if (!currentUser) return;
+  // Allow CCs and admins
+  if (currentUser.role !== 'cc' && currentUser.role !== 'admin') return;
+  if (activeLead) { showToast('A lead is already being routed', 'error'); return; }
+
+  const allOrdered = orderedPCs();
+  if (allOrdered.length === 0) {
+    showRoutingStatus('fail', 'No PCs available', 'Add Protection Consultants first.');
+    setTimeout(hideRoutingStatus, 4000);
+    return;
+  }
+
+  const startIdx = rotationPointer % allOrdered.length;
+  const queue = [];
+  for (let i = 0; i < allOrdered.length; i++) {
+    const idx = (startIdx + i) % allOrdered.length;
+    const pc = allOrdered[idx];
+    if (pc.status === 'available' && pc.online !== false) queue.push(pc.uid);
+  }
+
+  if (queue.length === 0) {
+    showRoutingStatus('fail', 'No PCs available', 'All Protection Consultants are busy or offline.');
+    setTimeout(hideRoutingStatus, 4000);
+    return;
+  }
+
+  const leadId = 'lead_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const lead = {
+    id: leadId,
+    fromUid: currentUser.uid,
+    fromName: currentUser.name,
+    createdAt: Date.now(),
+    queue,
+    queueIdx: 0,
+    status: 'pending',
+    acceptedBy: null,
+    expiresAt: Date.now() + (settings.acceptTimeout * 1000),
+    deniedBy: [],
+    sentAt: Date.now(),
+  };
+
+  await set(ref(db, `activeLeads/${leadId}`), lead);
+  activeLead = lead;
+  showRoutingStatus('routing', 'Routing…', `Sent to ${getName(queue[0])} · ${settings.acceptTimeout}s window`);
+  document.getElementById('ccCancelLead').style.display = '';
+  document.getElementById('ccCancelLead').onclick = async () => { await cancelLead(leadId); };
+
+  // Track CC initiated
+  await runTransaction(ref(db, `users/${currentUser.uid}`), (u) => {
+    if (!u) return;
+    u.totalCcLeads = (u.totalCcLeads || 0) + 1;
+    return u;
+  });
+
+  await logEvent({
+    type: 'lead_initiated', fromUid: currentUser.uid, fromName: currentUser.name, leadId,
+  });
+}
+
+async function cancelLead(leadId) {
+  const leadRef = ref(db, `activeLeads/${leadId}`);
+  await runTransaction(leadRef, (cur) => {
+    if (!cur || cur.status !== 'pending') return;
+    cur.status = 'cancelled';
+    return cur;
+  });
+  await remove(leadRef);
+  activeLead = null;
+  hideRoutingStatus();
+  await logEvent({ type: 'lead_cancelled', leadId, fromUid: currentUser.uid, fromName: currentUser.name });
+}
+
+// ============================================================
+// HANDLE ACTIVE LEADS
+// ============================================================
+let timeoutTickInterval = null;
+let pcCountdownTimer = null;
+
+function handleActiveLeads(leads) {
+  // CC perspective
+  if (currentUser && (currentUser.role === 'cc' || currentUser.role === 'admin')) {
+    if (activeLead && !leads[activeLead.id]) {
+      activeLead = null;
+    } else if (activeLead && leads[activeLead.id]) {
+      const updated = leads[activeLead.id];
+      activeLead = updated;
+      if (updated.status === 'accepted') {
+        showRoutingStatus('success', `Handover to ${getName(updated.acceptedBy)}`, 'They have accepted the lead.');
+        document.getElementById('ccCancelLead').style.display = 'none';
+        setTimeout(() => { hideRoutingStatus(); activeLead = null; }, 5000);
+        setTimeout(() => { remove(ref(db, `activeLeads/${updated.id}`)).catch(()=>{}); }, 6000);
+      } else if (updated.status === 'pending') {
+        const currentUid = updated.queue[updated.queueIdx];
+        if (currentUid) {
+          const remaining = Math.max(0, Math.ceil((updated.expiresAt - Date.now()) / 1000));
+          showRoutingStatus('routing', 'Routing…',
+            `Sent to ${getName(currentUid)} · ${remaining}s left ${updated.deniedBy.length > 0 ? `(${updated.deniedBy.length} declined)` : ''}`);
+        }
+      } else if (updated.status === 'failed') {
+        showRoutingStatus('fail', 'No consultant accepted', 'Nobody accepted the lead. Try again.');
+        document.getElementById('ccCancelLead').style.display = 'none';
+        setTimeout(() => { hideRoutingStatus(); activeLead = null; }, 5000);
+        setTimeout(() => { remove(ref(db, `activeLeads/${updated.id}`)).catch(()=>{}); }, 6000);
+      }
+    }
+  }
+
+  // PC perspective
+  if (currentUser && (currentUser.role === 'pc' || currentUser.role === 'admin')) {
+    let targetedLead = null;
+    Object.values(leads).forEach(l => {
+      if (l.status === 'pending' && l.queue && l.queue[l.queueIdx] === currentUser.uid) {
+        if (!l.deniedBy || !l.deniedBy.includes(currentUser.uid)) {
+          targetedLead = l;
+        }
+      }
+    });
+
+    if (targetedLead && (!incomingLead || incomingLead.id !== targetedLead.id)) {
+      showIncomingPopup(targetedLead);
+    } else if (!targetedLead && incomingLead) {
+      hideIncomingPopup();
+    } else if (targetedLead && incomingLead && targetedLead.id === incomingLead.id) {
+      // update countdown if expiresAt changed
+      incomingLead = targetedLead;
+    }
+  }
+
+  // Watchdog: any client can advance stale leads
+  Object.values(leads).forEach(async (l) => {
+    if (l.status === 'pending' && Date.now() > l.expiresAt + 500) {
+      await advanceLead(l.id, 'timeout');
+    }
+  });
+
+  if (!timeoutTickInterval) {
+    timeoutTickInterval = setInterval(() => {
+      get(ref(db, 'activeLeads')).then(snap => handleActiveLeads(snap.val() || {}));
+    }, 1000);
+  }
+}
+
+// ============================================================
+// PC FLOW: incoming popup
+// ============================================================
+function showIncomingPopup(lead) {
+  incomingLead = lead;
+  document.getElementById('incomingFromName').textContent = lead.fromName || 'CC';
+  document.getElementById('incomingOverlay').classList.add('show');
+
+  const pulse = document.getElementById('incomingPulse');
+  pulse.style.transition = 'none';
+  pulse.style.transform = 'scaleX(1)';
+  void pulse.offsetWidth;
+  const remainingMs = Math.max(0, lead.expiresAt - Date.now());
+  pulse.style.transition = `transform ${remainingMs}ms linear`;
+  pulse.style.transform = 'scaleX(0)';
+
+  if (pcCountdownTimer) clearInterval(pcCountdownTimer);
+  const tick = () => {
+    const remaining = Math.max(0, Math.ceil((lead.expiresAt - Date.now()) / 1000));
+    document.getElementById('incomingCountdown').textContent = remaining;
+    if (remaining <= 0) clearInterval(pcCountdownTimer);
+  };
+  tick();
+  pcCountdownTimer = setInterval(tick, 250);
+
+  // Audio cue
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+    o.start(); o.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function hideIncomingPopup() {
+  incomingLead = null;
+  document.getElementById('incomingOverlay').classList.remove('show');
+  if (pcCountdownTimer) { clearInterval(pcCountdownTimer); pcCountdownTimer = null; }
+}
+
+async function acceptIncomingLead() {
+  if (!incomingLead) return;
+  const leadId = incomingLead.id;
+  const acceptTime = Date.now();
+  hideIncomingPopup();
+
+  const result = await runTransaction(ref(db, `activeLeads/${leadId}`), (cur) => {
+    if (!cur || cur.status !== 'pending') return;
+    if (cur.queue[cur.queueIdx] !== currentUser.uid) return;
+    cur.status = 'accepted';
+    cur.acceptedBy = currentUser.uid;
+    cur.acceptedAt = acceptTime;
+    return cur;
+  });
+
+  if (result.committed && result.snapshot.exists() && result.snapshot.val().acceptedBy === currentUser.uid) {
+    const leadData = result.snapshot.val();
+    const responseTimeMs = acceptTime - (leadData.sentAt || leadData.createdAt);
+
+    // Update the PC's stats
+    await runTransaction(ref(db, `users/${currentUser.uid}`), (u) => {
+      if (!u) return;
+      u.totalLeads = (u.totalLeads || 0) + 1;
+      const tk = todayKey();
+      if (u.lastDay !== tk) { u.todayLeads = 0; u.lastDay = tk; }
+      u.todayLeads = (u.todayLeads || 0) + 1;
+      u.totalAccepted = (u.totalAccepted || 0) + 1;
+      u.lastReceived = acceptTime;
+      u.dailyHistory = u.dailyHistory || {};
+      u.dailyHistory[tk] = (u.dailyHistory[tk] || 0) + 1;
+      u.acceptTimes = u.acceptTimes || [];
+      u.acceptTimes.push(responseTimeMs);
+      if (u.acceptTimes.length > 50) u.acceptTimes = u.acceptTimes.slice(-50);
+      return u;
+    });
+
+    // Update CC's success counter
+    await runTransaction(ref(db, `users/${leadData.fromUid}`), (u) => {
+      if (!u) return;
+      u.totalCcSuccess = (u.totalCcSuccess || 0) + 1;
+      return u;
+    });
+
+    // Update pairing matrix: handovers/{ccUid}/{pcUid}
+    await runTransaction(ref(db, `handovers/${leadData.fromUid}/${currentUser.uid}`), (n) => (n || 0) + 1);
+
+    // Advance rotation pointer
+    const allOrdered = orderedPCs();
+    const myIdx = allOrdered.findIndex(p => p.uid === currentUser.uid);
+    if (myIdx >= 0) {
+      await set(ref(db, 'rotation/pointer'), (myIdx + 1) % allOrdered.length);
+    }
+
+    await logEvent({
+      type: 'lead_accepted',
+      leadId,
+      fromUid: leadData.fromUid,
+      fromName: leadData.fromName,
+      toUid: currentUser.uid,
+      toName: currentUser.name,
+      responseMs: responseTimeMs,
+    });
+
+    showToast('Lead accepted ✓', 'success');
+  }
+}
+
+async function denyIncomingLead() {
+  if (!incomingLead) return;
+  const leadId = incomingLead.id;
+  hideIncomingPopup();
+
+  await advanceLead(leadId, 'deny');
+
+  await runTransaction(ref(db, `users/${currentUser.uid}`), (u) => {
+    if (!u) return;
+    u.totalDenied = (u.totalDenied || 0) + 1;
+    return u;
+  });
+
+  await logEvent({
+    type: 'lead_denied', leadId,
+    toUid: currentUser.uid, toName: currentUser.name,
+  });
+}
+
+async function advanceLead(leadId, reason) {
+  const leadRef = ref(db, `activeLeads/${leadId}`);
+  let timedOutUid = null;
+  let failedNow = false;
+
+  const result = await runTransaction(leadRef, (cur) => {
+    if (!cur || cur.status !== 'pending') return;
+    const currentUid = cur.queue[cur.queueIdx];
+    if (!currentUid) return;
+    if (reason === 'timeout' && Date.now() < cur.expiresAt) return;
+    if (reason === 'timeout') timedOutUid = currentUid;
+
+    cur.deniedBy = cur.deniedBy || [];
+    if (!cur.deniedBy.includes(currentUid)) cur.deniedBy.push(currentUid);
+
+    cur.queueIdx = cur.queueIdx + 1;
+    if (cur.queueIdx >= cur.queue.length) {
+      cur.status = 'failed';
+      failedNow = true;
+    } else {
+      cur.expiresAt = Date.now() + (settings.acceptTimeout * 1000);
+      cur.sentAt = Date.now();
+    }
+    return cur;
+  });
+
+  if (result.committed) {
+    if (timedOutUid) {
+      await runTransaction(ref(db, `users/${timedOutUid}`), (u) => { if (!u) return; u.totalTimeouts = (u.totalTimeouts || 0) + 1; return u; });
+      await logEvent({ type: 'lead_timeout', leadId, toUid: timedOutUid, toName: getName(timedOutUid) });
+    }
+    if (failedNow) await logEvent({ type: 'lead_failed', leadId });
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function orderedPCs() {
+  return Object.values(usersMap).filter(u => u.role === 'pc').sort((a,b) => (a.order || 0) - (b.order || 0));
+}
+function orderedCCs() {
+  return Object.values(usersMap).filter(u => u.role === 'cc').sort((a,b) => (a.order || 0) - (b.order || 0));
+}
+function getName(uid) { return usersMap[uid]?.name || 'Unknown'; }
+
+async function logEvent(ev) {
+  const id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  await set(ref(db, `events/${id}`), { id, time: Date.now(), ...ev });
+  // best-effort trim
+  const allSnap = await get(ref(db, 'events'));
+  const all = allSnap.val() || {};
+  const sorted = Object.values(all).sort((a,b) => b.time - a.time);
+  if (sorted.length > 200) {
+    const updates = {};
+    sorted.slice(200).forEach(e => { updates[`events/${e.id}`] = null; });
+    await update(ref(db), updates);
+  }
+}
+
+function showRoutingStatus(state, title, detail) {
+  const el = document.getElementById('ccRoutingStatus');
+  el.classList.remove('success', 'fail');
+  if (state === 'success') el.classList.add('success');
+  if (state === 'fail') el.classList.add('fail');
+  el.classList.add('show');
+  document.getElementById('ccRoutingTitle').textContent = title;
+  document.getElementById('ccRoutingDetail').textContent = detail;
+}
+function hideRoutingStatus() {
+  document.getElementById('ccRoutingStatus').classList.remove('show');
+  document.getElementById('ccCancelLead').style.display = 'none';
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderAll() {
+  if (!currentUser) return;
+  if (currentUser.role === 'cc' || currentUser.role === 'admin') renderCCDashboard();
+  if (currentUser.role === 'pc' || currentUser.role === 'admin') renderPCDashboard();
+  renderInsights();
+  renderUsers();
+}
+
+function renderCCDashboard() {
+  const pcs = orderedPCs();
+  const available = pcs.filter(p => p.status === 'available' && p.online !== false).length;
+  const totalToday = pcs.reduce((s,p) => s + (p.todayLeads || 0), 0);
+  const yourToday = events.filter(e => e.type === 'lead_accepted' && e.fromUid === currentUser.uid && isToday(e.time)).length;
+
+  document.getElementById('ccStatYou').textContent = yourToday;
+  document.getElementById('ccStatAvailable').textContent = available;
+  document.getElementById('ccStatTotal').textContent = totalToday;
+  document.getElementById('ccPcCount').textContent = `${pcs.length} consultants · ${available} available`;
+
+  const root = document.getElementById('ccRoster');
+  if (pcs.length === 0) {
+    root.innerHTML = `<div class="empty-state" style="grid-column:1/-1">No Protection Consultants yet — admin can add them in Users.</div>`;
+    return;
+  }
+
+  const startIdx = rotationPointer % pcs.length;
+  let nextUid = null;
+  for (let i = 0; i < pcs.length; i++) {
+    const idx = (startIdx + i) % pcs.length;
+    if (pcs[idx].status === 'available' && pcs[idx].online !== false) { nextUid = pcs[idx].uid; break; }
+  }
+
+  root.innerHTML = pcs.map(p => {
+    const initials = (p.name || '?').split(/\s+/).slice(0,2).map(s => s[0]||'').join('').toUpperCase();
+    const isNext = p.uid === nextUid;
+    const isBusy = p.status === 'busy';
+    const isOffline = p.online === false;
+    return `<div class="agent-card ${isNext?'next':''} ${isBusy?'busy':''} ${isOffline?'offline':''}">
+      <div class="agent-head">
+        <div class="agent-avatar">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div class="agent-name">${escapeHtml(p.name)}</div>
+          <div class="agent-status">● ${isOffline?'Offline':(isBusy?'Busy':'Available')}</div>
+        </div>
+      </div>
+      <div class="agent-stats">
+        <div class="agent-stat"><div class="agent-stat-label">Today</div><div class="agent-stat-value">${p.todayLeads || 0}</div></div>
+        <div class="agent-stat"><div class="agent-stat-label">Total</div><div class="agent-stat-value">${p.totalLeads || 0}</div></div>
+        <div class="agent-stat"><div class="agent-stat-label">Last</div><div class="agent-stat-value" style="font-size:14px;font-family:var(--mono)">${p.lastReceived?timeAgo(p.lastReceived):'—'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderPCDashboard() {
+  if (!currentUser) return;
+  const me = usersMap[currentUser.uid] || currentUser;
+  document.getElementById('pcStatToday').textContent = me.todayLeads || 0;
+  document.getElementById('pcStatTotal').textContent = me.totalLeads || 0;
+  const acc = me.totalAccepted || 0;
+  const offered = (me.totalAccepted || 0) + (me.totalDenied || 0) + (me.totalTimeouts || 0);
+  const rate = offered > 0 ? Math.round((acc / offered) * 100) : null;
+  document.getElementById('pcStatAcceptance').textContent = rate !== null ? rate + '%' : '—';
+
+  const valEl = document.getElementById('pcStatusValue');
+  const iconEl = document.getElementById('pcStatusIcon');
+  const btn = document.getElementById('pcToggleStatus');
+  if (me.status === 'busy') {
+    valEl.textContent = 'Busy'; valEl.className = 'status-value busy';
+    iconEl.classList.add('busy'); iconEl.textContent = '⏸';
+    btn.textContent = 'Set Available'; btn.className = 'toggle-status-btn to-available';
+    document.getElementById('pcGreeting').textContent = 'paused.';
+  } else {
+    valEl.textContent = 'Available'; valEl.className = 'status-value available';
+    iconEl.classList.remove('busy'); iconEl.textContent = '●';
+    btn.textContent = 'Set Busy'; btn.className = 'toggle-status-btn to-busy';
+    document.getElementById('pcGreeting').textContent = 'ready.';
+  }
+
+  renderPCFeed();
+}
+
+function renderPCFeed() {
+  const root = document.getElementById('pcFeed');
+  if (!root || !currentUser) return;
+  const myEvents = events.filter(e => e.toUid === currentUser.uid || e.fromUid === currentUser.uid).slice(0, 20);
+  if (myEvents.length === 0) {
+    root.innerHTML = `<div class="empty-state">No leads yet — sit tight.</div>`;
+    return;
+  }
+  root.innerHTML = `<div class="feed-row head"><span>Time</span><span>Event</span><span>From CC</span><span>To PC</span><span>Result</span></div>` +
+    myEvents.map(e => feedRowHTML(e)).join('');
+}
+
+function renderActivity() {
+  const root = document.getElementById('activityBody');
+  if (!root) return;
+  if (events.length === 0) { root.innerHTML = `<div class="empty-state">No activity yet</div>`; return; }
+  root.innerHTML = events.map(e => feedRowHTML(e)).join('');
+}
+
+function feedRowHTML(e) {
+  let label, fromN = '—', toN = '—', tag = '·', tagClass = 'tag-neutral';
+  switch (e.type) {
+    case 'lead_initiated': label = 'Lead initiated'; fromN = e.fromName; tag = 'New'; tagClass = 'tag-info'; break;
+    case 'lead_accepted':
+      label = `Handover completed${e.responseMs ? ` (${(e.responseMs/1000).toFixed(1)}s)` : ''}`;
+      fromN = e.fromName; toN = e.toName; tag = 'Accepted'; tagClass = 'tag-accepted'; break;
+    case 'lead_denied': label = 'PC denied'; toN = e.toName; tag = 'Denied'; tagClass = 'tag-denied'; break;
+    case 'lead_timeout': label = 'PC didn\'t respond'; toN = e.toName; tag = 'Timeout'; tagClass = 'tag-timeout'; break;
+    case 'lead_failed': label = 'No PC accepted'; tag = 'Failed'; tagClass = 'tag-denied'; break;
+    case 'lead_cancelled': label = 'Cancelled by CC'; fromN = e.fromName; tag = 'Cancelled'; tagClass = 'tag-neutral'; break;
+    case 'user_added': label = 'User added'; toN = e.name; tag = e.role || 'New'; tagClass = 'tag-info'; break;
+    case 'user_removed': label = 'User removed'; toN = e.name; tag = 'Removed'; tagClass = 'tag-denied'; break;
+    case 'pin_reset': label = 'PIN reset by admin'; toN = e.name; tag = 'PIN'; tagClass = 'tag-info'; break;
+    case 'status_change': label = `Status → ${e.status}`; toN = e.name; tag = e.status; tagClass = e.status === 'busy' ? 'tag-timeout' : 'tag-accepted'; break;
+    default: label = e.type;
+  }
+  return `<div class="feed-row">
+    <span class="feed-time">${formatTime(e.time)}</span>
+    <span>${label}</span>
+    <span class="feed-name">${escapeHtml(fromN)}</span>
+    <span class="feed-name">${escapeHtml(toN)}</span>
+    <span class="feed-tag ${tagClass}">${tag}</span>
+  </div>`;
+}
+
+// ============================================================
+// INSIGHTS
+// ============================================================
+function renderInsights() {
+  if (!currentUser) return;
+  const role = effectiveRole();
+
+  // Title
+  const title = document.getElementById('insightsTitle');
+  const scope = document.getElementById('insightsScope');
+
+  // KPIs
+  const kpiGrid = document.getElementById('kpiGrid');
+  const adminBlock = document.getElementById('adminInsightsBlock');
+
+  if (role === 'cc') {
+    title.textContent = 'Your CC Performance';
+    scope.textContent = 'All-time · You';
+    const me = usersMap[currentUser.uid] || currentUser;
+    const myEvents = events.filter(e => e.fromUid === currentUser.uid);
+    const accepted = myEvents.filter(e => e.type === 'lead_accepted').length;
+    const initiated = me.totalCcLeads || 0;
+    const todayInitiated = events.filter(e => e.type === 'lead_initiated' && e.fromUid === currentUser.uid && isToday(e.time)).length;
+    const successRate = initiated > 0 ? Math.round((me.totalCcSuccess || 0) / initiated * 100) : null;
+
+    // Find their favourite PC
+    const handoverCounts = {};
+    events.filter(e => e.type === 'lead_accepted' && e.fromUid === currentUser.uid).forEach(e => {
+      handoverCounts[e.toUid] = (handoverCounts[e.toUid] || 0) + 1;
+    });
+    const sortedPCs = Object.entries(handoverCounts).sort((a,b) => b[1] - a[1]);
+    const topPCName = sortedPCs.length ? getName(sortedPCs[0][0]) : '—';
+
+    kpiGrid.innerHTML = `
+      <div class="kpi"><div class="kpi-label">Total Initiated</div><div class="kpi-value">${initiated}</div><div class="kpi-sub">All-time</div></div>
+      <div class="kpi"><div class="kpi-label">Today</div><div class="kpi-value">${todayInitiated}</div><div class="kpi-sub">Initiated today</div></div>
+      <div class="kpi"><div class="kpi-label">Success Rate</div><div class="kpi-value">${successRate !== null ? successRate + '%' : '—'}</div><div class="kpi-sub">% accepted by PCs</div></div>
+      <div class="kpi"><div class="kpi-label">Top PC</div><div class="kpi-value" style="font-size:24px">${escapeHtml(topPCName)}</div><div class="kpi-sub">Most handovers</div></div>
+    `;
+    adminBlock.style.display = 'none';
+    return;
+  }
+
+  if (role === 'pc') {
+    title.textContent = 'Your PC Performance';
+    scope.textContent = 'All-time · You';
+    const me = usersMap[currentUser.uid] || currentUser;
+    const offered = (me.totalAccepted || 0) + (me.totalDenied || 0) + (me.totalTimeouts || 0);
+    const rate = offered > 0 ? Math.round((me.totalAccepted || 0) / offered * 100) : null;
+    const avgResp = (me.acceptTimes && me.acceptTimes.length) ? (me.acceptTimes.reduce((s,n)=>s+n,0) / me.acceptTimes.length / 1000).toFixed(1) : null;
+
+    // Favourite CC source
+    const sourceCounts = {};
+    events.filter(e => e.type === 'lead_accepted' && e.toUid === currentUser.uid).forEach(e => {
+      sourceCounts[e.fromUid] = (sourceCounts[e.fromUid] || 0) + 1;
+    });
+    const sortedCCs = Object.entries(sourceCounts).sort((a,b) => b[1] - a[1]);
+    const topCCName = sortedCCs.length ? getName(sortedCCs[0][0]) : '—';
+
+    kpiGrid.innerHTML = `
+      <div class="kpi"><div class="kpi-label">Total Accepted</div><div class="kpi-value">${me.totalAccepted || 0}</div><div class="kpi-sub">All-time</div></div>
+      <div class="kpi"><div class="kpi-label">Today</div><div class="kpi-value">${me.todayLeads || 0}</div></div>
+      <div class="kpi"><div class="kpi-label">Acceptance Rate</div><div class="kpi-value">${rate !== null ? rate + '%' : '—'}</div><div class="kpi-sub">${me.totalDenied || 0} denied · ${me.totalTimeouts || 0} timeouts</div></div>
+      <div class="kpi"><div class="kpi-label">Avg Response</div><div class="kpi-value">${avgResp !== null ? avgResp + 's' : '—'}</div><div class="kpi-sub">Most handovers from ${escapeHtml(topCCName)}</div></div>
+    `;
+    adminBlock.style.display = 'none';
+    return;
+  }
+
+  // ADMIN VIEW
+  title.textContent = 'Performance Insights';
+  scope.textContent = 'All-time · Full team';
+  adminBlock.style.display = '';
+
+  const pcs = orderedPCs();
+  const ccs = orderedCCs();
+  const totalAll = pcs.reduce((s,p) => s + (p.totalLeads || 0), 0);
+  const totalToday = pcs.reduce((s,p) => s + (p.todayLeads || 0), 0);
+  const totalInitiated = ccs.reduce((s,c) => s + (c.totalCcLeads || 0), 0);
+  const totalSuccess = ccs.reduce((s,c) => s + (c.totalCcSuccess || 0), 0);
+  const overallSuccess = totalInitiated > 0 ? Math.round((totalSuccess / totalInitiated) * 100) : null;
+
+  // Fairness
+  let fairnessText = '—', fairnessSub = pcs.length < 2 ? 'Need 2+ PCs' : 'No leads yet';
+  if (pcs.length >= 2 && totalAll > 0) {
+    const avg = totalAll / pcs.length;
+    const variance = pcs.reduce((s,p) => s + Math.pow((p.totalLeads || 0) - avg, 2), 0) / pcs.length;
+    const cv = avg > 0 ? Math.sqrt(variance) / avg : 0;
+    const fairness = Math.max(0, Math.min(100, (1 - cv) * 100));
+    fairnessText = fairness.toFixed(0) + '%';
+    fairnessSub = fairness > 90 ? 'Excellently balanced' :
+      fairness > 75 ? 'Well balanced' :
+      fairness > 60 ? 'Reasonably balanced' :
+      fairness > 40 ? 'Imbalanced — review' : 'Highly imbalanced';
+  }
+
+  kpiGrid.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total Handovers</div><div class="kpi-value">${totalAll}</div><div class="kpi-sub">All-time accepted</div></div>
+    <div class="kpi"><div class="kpi-label">Today</div><div class="kpi-value">${totalToday}</div><div class="kpi-sub">${totalAll > 0 ? Math.round(totalToday / totalAll * 100) + '% of all-time' : '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Success Rate</div><div class="kpi-value">${overallSuccess !== null ? overallSuccess + '%' : '—'}</div><div class="kpi-sub">${totalInitiated} initiated · ${totalSuccess} accepted</div></div>
+    <div class="kpi"><div class="kpi-label">Fairness</div><div class="kpi-value">${fairnessText}</div><div class="kpi-sub">${fairnessSub}</div></div>
+  `;
+
+  // PC Leaderboard
+  const sortedPCs = [...pcs].sort((a,b) => (b.totalLeads||0) - (a.totalLeads||0));
+  const maxPc = sortedPCs[0]?.totalLeads || 1;
+  const lbBody = document.getElementById('leaderboardBody');
+  lbBody.innerHTML = sortedPCs.length === 0
+    ? `<div class="empty-state">No PCs yet</div>`
+    : sortedPCs.map((p, i) => {
+        const offered = (p.totalAccepted || 0) + (p.totalDenied || 0) + (p.totalTimeouts || 0);
+        const rate = offered > 0 ? Math.round((p.totalAccepted || 0) / offered * 100) : null;
+        const pct = maxPc > 0 ? ((p.totalLeads || 0) / maxPc * 100) : 0;
+        return `<div class="leader-row">
+          <span class="leader-rank ${i===0?'top':''}">${i+1}</span>
+          <span class="leader-name">${escapeHtml(p.name)}</span>
+          <span class="leader-num leader-num-today">${p.todayLeads || 0}</span>
+          <span class="leader-bar-cell"><div class="leader-bar"><div class="leader-bar-fill" style="width:${pct}%"></div></div></span>
+          <span class="leader-num leader-num-rate">${rate !== null ? rate + '%' : '—'}</span>
+          <span class="leader-num">${p.totalLeads || 0}</span>
+        </div>`;
+      }).join('');
+
+  // CC Leaderboard
+  const sortedCCs = [...ccs].sort((a,b) => (b.totalCcLeads||0) - (a.totalCcLeads||0));
+  const maxCc = sortedCCs[0]?.totalCcLeads || 1;
+  const ccBody = document.getElementById('ccLeaderboardBody');
+  ccBody.innerHTML = sortedCCs.length === 0
+    ? `<div class="empty-state">No CCs yet</div>`
+    : sortedCCs.map((c, i) => {
+        const todayCount = events.filter(e => e.type === 'lead_initiated' && e.fromUid === c.uid && isToday(e.time)).length;
+        const rate = (c.totalCcLeads || 0) > 0 ? Math.round((c.totalCcSuccess || 0) / c.totalCcLeads * 100) : null;
+        const pct = maxCc > 0 ? ((c.totalCcLeads || 0) / maxCc * 100) : 0;
+        return `<div class="leader-row">
+          <span class="leader-rank ${i===0?'top':''}">${i+1}</span>
+          <span class="leader-name">${escapeHtml(c.name)}</span>
+          <span class="leader-num leader-num-today">${todayCount}</span>
+          <span class="leader-bar-cell"><div class="leader-bar"><div class="leader-bar-fill" style="width:${pct}%"></div></div></span>
+          <span class="leader-num leader-num-rate">${rate !== null ? rate + '%' : '—'}</span>
+          <span class="leader-num">${c.totalCcLeads || 0}</span>
+        </div>`;
+      }).join('');
+
+  renderMatrix(ccs, pcs);
+  renderTopPairings();
+  renderChart();
+  renderHeatmap();
+  renderResponseTimes();
+  renderReliability();
+}
+
+async function renderMatrix(ccs, pcs) {
+  // Pull handovers map
+  const wrap = document.getElementById('matrixWrap');
+  const snap = await get(ref(db, 'handovers'));
+  const data = snap.val() || {};
+
+  if (ccs.length === 0 || pcs.length === 0) {
+    wrap.innerHTML = `<div class="empty-state" style="padding:24px">Need at least 1 CC and 1 PC</div>`;
+    return;
+  }
+
+  // Compute max for heat scaling
+  let max = 0;
+  ccs.forEach(c => { pcs.forEach(p => { const v = data[c.uid]?.[p.uid] || 0; if (v > max) max = v; }); });
+
+  const heatClass = (v) => {
+    if (v === 0) return 'zero';
+    const ratio = v / max;
+    if (ratio > 0.66) return 'heat-4';
+    if (ratio > 0.33) return 'heat-3';
+    if (ratio > 0.1) return 'heat-2';
+    return 'heat-1';
+  };
+
+  let html = '<table class="matrix"><thead><tr><th class="row-head">CC \\ PC</th>';
+  pcs.forEach(p => { html += `<th>${escapeHtml(p.name.split(' ')[0])}</th>`; });
+  html += '<th>Total</th></tr></thead><tbody>';
+  ccs.forEach(c => {
+    let rowTotal = 0;
+    html += `<tr><td class="row-head">${escapeHtml(c.name)}</td>`;
+    pcs.forEach(p => {
+      const v = data[c.uid]?.[p.uid] || 0;
+      rowTotal += v;
+      html += `<td class="${heatClass(v)}">${v || ''}</td>`;
+    });
+    html += `<td class="row-head">${rowTotal}</td>`;
+    html += `</tr>`;
+  });
+  // Column totals
+  html += `<tr><td class="row-head">Total</td>`;
+  pcs.forEach(p => {
+    let col = 0;
+    ccs.forEach(c => { col += data[c.uid]?.[p.uid] || 0; });
+    html += `<td class="row-head">${col}</td>`;
+  });
+  html += `<td></td></tr></tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+async function renderTopPairings() {
+  const root = document.getElementById('topPairings');
+  const snap = await get(ref(db, 'handovers'));
+  const data = snap.val() || {};
+  const pairs = [];
+  Object.entries(data).forEach(([ccUid, pcs]) => {
+    Object.entries(pcs).forEach(([pcUid, count]) => {
+      pairs.push({ ccUid, pcUid, count });
+    });
+  });
+  pairs.sort((a,b) => b.count - a.count);
+  const top = pairs.slice(0, 6);
+
+  if (top.length === 0) {
+    root.innerHTML = `<div class="empty-state" style="padding:24px">No handovers yet</div>`;
+    return;
+  }
+
+  const max = top[0].count || 1;
+  root.innerHTML = top.map((p, i) => {
+    const pct = (p.count / max) * 100;
+    return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)">
+      <span class="leader-rank ${i===0?'top':''}" style="font-size:18px">${i+1}</span>
+      <div>
+        <div style="font-size:13px;color:var(--ink-dim);margin-bottom:4px">${escapeHtml(getName(p.ccUid))} → ${escapeHtml(getName(p.pcUid))}</div>
+        <div class="leader-bar"><div class="leader-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <span class="leader-num" style="font-size:16px">${p.count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderChart() {
+  const svg = document.getElementById('chart');
+  if (!svg) return;
+  const pcs = orderedPCs();
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let total = 0;
+    pcs.forEach(p => { total += (p.dailyHistory?.[key] || 0); });
+    days.push({ label: d.toLocaleDateString('en', { month: 'short', day: 'numeric' }), value: total });
+  }
+
+  const W = 800, H = 200, padX = 40, padY = 24;
+  const max = Math.max(1, ...days.map(d => d.value));
+  const barW = (W - padX*2) / days.length * 0.7;
+  const gap = (W - padX*2) / days.length * 0.3;
+  const chartH = H - padY*2;
+  let html = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = padY + (chartH * i / 4);
+    const val = Math.round(max - (max * i / 4));
+    html += `<line x1="${padX}" y1="${y}" x2="${W-padX}" y2="${y}" stroke="#2a2521" stroke-width="1"/>`;
+    html += `<text x="${padX-8}" y="${y+4}" text-anchor="end" fill="#7a7065" font-size="10" font-family="JetBrains Mono">${val}</text>`;
+  }
+  days.forEach((d, i) => {
+    const x = padX + i * ((W-padX*2)/days.length) + gap/2;
+    const h = (d.value/max) * chartH;
+    const y = padY + chartH - h;
+    html += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${d.value>0?'#d97706':'#3a332d'}" opacity="${d.value>0?1:0.3}" rx="2"/>`;
+    if (i % 2 === 0 || i === days.length - 1) html += `<text x="${x+barW/2}" y="${H-6}" text-anchor="middle" fill="#7a7065" font-size="9" font-family="JetBrains Mono">${d.label}</text>`;
+    if (d.value > 0) html += `<text x="${x+barW/2}" y="${y-4}" text-anchor="middle" fill="#f4ede2" font-size="10" font-family="JetBrains Mono" font-weight="500">${d.value}</text>`;
+  });
+  svg.innerHTML = html;
+}
+
+function renderHeatmap() {
+  const root = document.getElementById('heatmap');
+  if (!root) return;
+
+  // 7 days × 24 hours
+  const grid = Array.from({length: 7}, () => Array(24).fill(0));
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  events.filter(e => e.type === 'lead_accepted' && e.time > cutoff).forEach(e => {
+    const d = new Date(e.time);
+    const day = (d.getDay() + 6) % 7; // Mon=0
+    grid[day][d.getHours()]++;
+  });
+
+  const max = Math.max(1, ...grid.flat());
+  const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = '';
+  for (let r = 0; r < 7; r++) {
+    html += `<div class="heat-grid"><div class="heat-label">${dayLabels[r]}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const v = grid[r][h];
+      const op = v === 0 ? 0.05 : 0.15 + (v / max) * 0.85;
+      html += `<div class="heat-cell" style="background:rgba(217,119,6,${op})" title="${dayLabels[r]} ${h}:00 — ${v} leads">${v || ''}</div>`;
+    }
+    html += `</div>`;
+  }
+  // Hour labels at the bottom
+  html += `<div class="heat-grid" style="margin-top:6px"><div class="heat-label"></div>`;
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="heat-cell" style="background:transparent;border:none;color:var(--ink-mute)">${h % 3 === 0 ? h : ''}</div>`;
+  }
+  html += `</div>`;
+  root.innerHTML = html;
+}
+
+function renderResponseTimes() {
+  const root = document.getElementById('responseTimes');
+  if (!root) return;
+  const pcs = orderedPCs().filter(p => p.acceptTimes && p.acceptTimes.length > 0);
+  if (pcs.length === 0) {
+    root.innerHTML = `<div class="empty-state" style="padding:24px">No accepts yet</div>`;
+    return;
+  }
+  const data = pcs.map(p => {
+    const avg = p.acceptTimes.reduce((s,n) => s+n, 0) / p.acceptTimes.length / 1000;
+    return { name: p.name, avg, samples: p.acceptTimes.length };
+  }).sort((a,b) => a.avg - b.avg);
+
+  const max = Math.max(...data.map(d => d.avg)) || 1;
+  root.innerHTML = data.map((d, i) => {
+    const pct = (d.avg / max) * 100;
+    const color = d.avg < 3 ? 'var(--good)' : d.avg < 6 ? 'var(--accent)' : 'var(--bad)';
+    return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)">
+      <span class="leader-rank ${i===0?'top':''}" style="font-size:18px">${i+1}</span>
+      <div>
+        <div style="font-size:13px;color:var(--ink-dim);margin-bottom:4px">${escapeHtml(d.name)} <span style="color:var(--ink-mute);font-family:var(--mono);font-size:10px">· ${d.samples} sample${d.samples!==1?'s':''}</span></div>
+        <div class="leader-bar"><div class="leader-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>
+      <span class="leader-num" style="font-size:14px">${d.avg.toFixed(1)}s</span>
+    </div>`;
+  }).join('');
+}
+
+function renderReliability() {
+  const root = document.getElementById('reliability');
+  if (!root) return;
+  const pcs = orderedPCs();
+  if (pcs.length === 0) { root.innerHTML = `<div class="empty-state" style="padding:24px">No PCs</div>`; return; }
+  const data = pcs.map(p => {
+    const denied = p.totalDenied || 0;
+    const timed = p.totalTimeouts || 0;
+    return { name: p.name, denied, timed, total: denied + timed };
+  }).sort((a,b) => b.total - a.total);
+
+  const max = Math.max(...data.map(d => d.total)) || 1;
+  root.innerHTML = data.map(d => {
+    const pct = (d.total / max) * 100;
+    return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)">
+      <span style="font-family:var(--serif);font-size:14px;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(d.name)}</span>
+      <div>
+        <div class="leader-bar"><div class="leader-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,var(--bad),var(--busy))"></div></div>
+      </div>
+      <span class="leader-num" style="font-size:13px;color:var(--ink-dim)">${d.denied}d / ${d.timed}t</span>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// USERS PAGE
+// ============================================================
+function renderUsers() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const all = Object.values(usersMap).sort((a,b) => (a.order || 0) - (b.order || 0));
+  document.getElementById('usersCount').textContent = `${all.length} user${all.length!==1?'s':''}`;
+  const body = document.getElementById('usersBody');
+  if (all.length === 0) { body.innerHTML = `<div class="empty-state">No users yet</div>`; return; }
+
+  body.innerHTML = all.map(u => {
+    const status = u.online === false ? 'Offline' : (u.status === 'busy' ? 'Busy' : 'Available');
+    const statusColor = u.online === false ? 'var(--ink-mute)' : (u.status === 'busy' ? 'var(--busy)' : 'var(--good)');
+    const isLocked = u.lockedUntil && Date.now() < u.lockedUntil;
+    const isMe = u.uid === currentUser.uid;
+    return `<div class="users-row">
+      <span>
+        <span class="feed-name" style="font-size:14px">${escapeHtml(u.name)}</span>
+        ${u.mustChangePin ? `<span class="lock-pill" style="margin-left:8px">PIN: 0000</span>` : ''}
+        ${isLocked ? `<span class="lock-pill" style="margin-left:8px">Locked</span>` : ''}
+      </span>
+      <span class="users-role-cell"><span class="role-pill role-${u.role}">${u.role}</span></span>
+      <span class="users-status-cell" style="color:${statusColor};font-family:var(--mono);font-size:11px">● ${status}</span>
+      <span style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+        ${isLocked ? `<button class="btn btn-info" data-act="unlock" data-uid="${u.uid}">Unlock</button>` : ''}
+        <button class="btn" data-act="resetpin" data-uid="${u.uid}">Reset PIN</button>
+        ${!isMe ? `<button class="btn btn-bad" data-act="remove" data-uid="${u.uid}">Remove</button>` : '<span style="font-size:11px;color:var(--ink-mute);align-self:center">(you)</span>'}
+      </span>
+    </div>`;
+  }).join('');
+
+  body.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleUserAction(btn.dataset.act, btn.dataset.uid));
+  });
+}
+
+async function handleUserAction(action, uid) {
+  const u = usersMap[uid];
+  if (!u) return;
+
+  if (action === 'remove') {
+    openModal(`Remove ${u.name}?`, `Their profile and stats will be permanently deleted.`, async () => {
+      await remove(ref(db, `users/${uid}`));
+      await logEvent({ type: 'user_removed', name: u.name, role: u.role });
+      showToast(`${u.name} removed`);
+    });
+  } else if (action === 'resetpin') {
+    openModal(`Reset PIN for ${u.name}?`, `Their PIN will be reset to 0000 and they'll be forced to change it on next login.`, async () => {
+      const salt = makeSalt();
+      const hash = await hashPin('0000', salt);
+      await update(ref(db, `users/${uid}`), {
+        pinHash: hash, pinSalt: salt, mustChangePin: true,
+        failedAttempts: [], lockedUntil: null,
+      });
+      await logEvent({ type: 'pin_reset', name: u.name });
+      showToast(`PIN reset for ${u.name}`);
+    });
+  } else if (action === 'unlock') {
+    await update(ref(db, `users/${uid}`), { failedAttempts: [], lockedUntil: null });
+    showToast(`${u.name} unlocked`);
+  }
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatTime(t) {
+  return new Date(t).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function timeAgo(t) {
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm';
+  if (s < 86400) return Math.floor(s/3600) + 'h';
+  return Math.floor(s/86400) + 'd';
+}
+function isToday(t) {
+  const d = new Date(t), n = new Date();
+  return d.toDateString() === n.toDateString();
+}
+
+let toastTimer = null;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+let modalConfirmCb = null;
+function openModal(title, text, onConfirm) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent = text;
+  modalConfirmCb = onConfirm;
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('show');
+  modalConfirmCb = null;
+}
+
+// ============================================================
+// APP SHELL UI
+// ============================================================
+function bindAppShellUI() {
+  document.getElementById('signOutBtn').addEventListener('click', async () => {
+    if (currentUser) await update(ref(db, `users/${currentUser.uid}`), { online: false });
+    cleanupSubscriptions();
+    if (timeoutTickInterval) { clearInterval(timeoutTickInterval); timeoutTickInterval = null; }
+    localStorage.removeItem(LS_SESSION);
+    currentUser = null;
+    showLoginScreen();
+  });
+
+  document.getElementById('liveLeadBtn').addEventListener('click', triggerLiveLead);
+
+  document.getElementById('pcToggleStatus').addEventListener('click', async () => {
+    if (!currentUser) return;
+    const me = usersMap[currentUser.uid] || currentUser;
+    const newStatus = me.status === 'busy' ? 'available' : 'busy';
+    await update(ref(db, `users/${currentUser.uid}`), { status: newStatus });
+    await logEvent({ type: 'status_change', name: me.name, status: newStatus, toUid: currentUser.uid });
+  });
+
+  document.getElementById('acceptBtn').addEventListener('click', acceptIncomingLead);
+  document.getElementById('denyBtn').addEventListener('click', denyIncomingLead);
+
+  // View-as
+  document.getElementById('viewAsOptions').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    viewAs = btn.dataset.view;
+    syncViewAsButtons();
+    // Refresh nav based on view-as role
+    if (viewAs === 'cc') showPage('cc-dashboard');
+    else if (viewAs === 'pc') showPage('pc-dashboard');
+    renderInsights();
+  });
+
+  // User management
+  document.getElementById('addUserBtn').addEventListener('click', addUserFlow);
+
+  // PIN change (own)
+  document.getElementById('changePinBtn').addEventListener('click', async () => {
+    const cur = document.getElementById('myCurrentPin').value.trim();
+    const n1 = document.getElementById('myNewPin').value.trim();
+    const n2 = document.getElementById('myNewPin2').value.trim();
+    if (!/^\d{4}$/.test(cur) || !/^\d{4}$/.test(n1)) return showToast('PINs must be 4 digits', 'error');
+    if (n1 !== n2) return showToast('New PINs do not match', 'error');
+    if (n1 === '0000') return showToast('Pick a more secure PIN than 0000', 'error');
+
+    const expected = await hashPin(cur, currentUser.pinSalt);
+    if (expected !== currentUser.pinHash) return showToast('Current PIN is incorrect', 'error');
+
+    const salt = makeSalt();
+    const hash = await hashPin(n1, salt);
+    await update(ref(db, `users/${currentUser.uid}`), { pinHash: hash, pinSalt: salt, mustChangePin: false });
+    document.getElementById('myCurrentPin').value = '';
+    document.getElementById('myNewPin').value = '';
+    document.getElementById('myNewPin2').value = '';
+    showToast('PIN updated', 'success');
+  });
+
+  document.getElementById('cfgSaveSettings').addEventListener('click', async () => {
+    const v = parseInt(document.getElementById('cfgTimeout').value);
+    if (isNaN(v) || v < 5 || v > 60) return showToast('Timeout must be 5-60 seconds', 'error');
+    await set(ref(db, 'settings'), { acceptTimeout: v });
+    showToast('Settings saved', 'success');
+  });
+
+  document.getElementById('cfgReconfigure').addEventListener('click', () => {
+    openModal('Reconfigure Firebase?', 'You will be signed out and returned to the setup screen.', async () => {
+      cleanupSubscriptions();
+      localStorage.removeItem(LS_CFG);
+      localStorage.removeItem(LS_SESSION);
+      location.reload();
+    });
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    const snap = await get(ref(db, '/'));
+    // Strip PIN hashes from export for safety
+    const data = snap.val() || {};
+    if (data.users) {
+      Object.values(data.users).forEach(u => { delete u.pinHash; delete u.pinSalt; });
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `relay-export-${todayKey()}.json`; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported (PIN hashes excluded)', 'success');
+  });
+
+  document.getElementById('resetCounts').addEventListener('click', () => {
+    openModal('Reset all counts?', 'All stats reset to zero. Accounts and PINs preserved.', async () => {
+      const updates = {};
+      Object.keys(usersMap).forEach(uid => {
+        updates[`users/${uid}/totalLeads`] = 0;
+        updates[`users/${uid}/todayLeads`] = 0;
+        updates[`users/${uid}/totalAccepted`] = 0;
+        updates[`users/${uid}/totalDenied`] = 0;
+        updates[`users/${uid}/totalTimeouts`] = 0;
+        updates[`users/${uid}/totalCcLeads`] = 0;
+        updates[`users/${uid}/totalCcSuccess`] = 0;
+        updates[`users/${uid}/dailyHistory`] = {};
+        updates[`users/${uid}/acceptTimes`] = [];
+      });
+      updates['handovers'] = {};
+      await update(ref(db), updates);
+      showToast('Counts reset', 'success');
+    });
+  });
+
+  document.getElementById('resetEvents').addEventListener('click', () => {
+    openModal('Clear activity feed?', 'All events deleted.', async () => {
+      await set(ref(db, 'events'), {});
+      showToast('Activity cleared');
+    });
+  });
+
+  document.getElementById('resetRotation').addEventListener('click', () => {
+    openModal('Reset rotation pointer?', 'Next lead routes to first PC in order.', async () => {
+      await set(ref(db, 'rotation/pointer'), 0);
+      showToast('Rotation reset');
+    });
+  });
+
+  setInterval(() => {
+    const cfg = loadCfg();
+    if (cfg) {
+      const el = document.getElementById('cfgCurrentProject');
+      if (el) el.textContent = cfg.projectId;
+    }
+  }, 1000);
+
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('modalConfirm').addEventListener('click', () => {
+    if (modalConfirmCb) modalConfirmCb();
+    closeModal();
+  });
+  document.getElementById('modalBg').addEventListener('click', (e) => {
+    if (e.target.id === 'modalBg') closeModal();
+  });
+}
+
+async function addUserFlow() {
+  const name = document.getElementById('newUserName').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  if (!name) return showToast('Name is required', 'error');
+
+  // Check duplicate name
+  if (Object.values(usersMap).some(u => u.name.toLowerCase() === name.toLowerCase())) {
+    return showToast('A user with that name already exists', 'error');
+  }
+
+  const uid = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const salt = makeSalt();
+  const hash = await hashPin('0000', salt);
+  const orders = Object.values(usersMap).map(u => u.order || 0);
+  const nextOrder = orders.length ? Math.max(...orders) + 1 : 0;
+
+  await set(ref(db, `users/${uid}`), {
+    uid, name, role,
+    status: 'available',
+    totalLeads: 0, todayLeads: 0,
+    totalAccepted: 0, totalDenied: 0, totalTimeouts: 0,
+    totalCcLeads: 0, totalCcSuccess: 0,
+    acceptTimes: [],
+    pinHash: hash, pinSalt: salt,
+    mustChangePin: true,
+    createdAt: Date.now(),
+    order: nextOrder,
+    dailyHistory: {},
+    lastDay: todayKey(),
+  });
+
+  await logEvent({ type: 'user_added', name, role });
+  document.getElementById('newUserName').value = '';
+  showToast(`${name} added · default PIN is 0000`, 'success');
+}
+
+// BOOT
+boot();
+</script>
+
+</body>
+</html>
