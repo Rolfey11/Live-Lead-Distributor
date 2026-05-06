@@ -1201,6 +1201,20 @@ const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_WINDOW_MS = 5 * 60 * 1000;
 const LOCKOUT_DURATION_MS = 10 * 60 * 1000;
 
+// Hardcoded Firebase config — Relay project
+// databaseURL must match the region your Realtime Database was created in.
+// US default: https://<project-id>-default-rtdb.firebaseio.com
+// EU:        https://<project-id>-default-rtdb.europe-west1.firebasedatabase.app
+const HARDCODED_FIREBASE_CFG = {
+  apiKey: "AIzaSyAe9lmn8tI66X622ltNw1oTUmSls3ScAG8",
+  authDomain: "live-lead-distributor.firebaseapp.com",
+  databaseURL: "https://live-lead-distributor-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "live-lead-distributor",
+  storageBucket: "live-lead-distributor.firebasestorage.app",
+  messagingSenderId: "884417621256",
+  appId: "1:884417621256:web:362cbe9b603b96ede390bd"
+};
+
 // STATE
 let firebaseApp = null;
 let db = null;
@@ -1245,14 +1259,10 @@ function boot() {
   bindPinChangeUI();
   bindAppShellUI();
 
-  const cfg = loadCfg();
-  if (!cfg) {
-    showLoginScreen();
-    document.getElementById('firebaseSetupNotice').style.display = 'block';
-    return;
-  }
-
-  initFirebase(cfg);
+  // Always use hardcoded config — setup screen is bypassed.
+  // (Setup UI is still bound above so the Reconfigure flow doesn't crash if accessed.)
+  saveCfg(HARDCODED_FIREBASE_CFG);
+  initFirebase(HARDCODED_FIREBASE_CFG);
 }
 
 function loadCfg() {
@@ -1262,22 +1272,8 @@ function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
 
 function initFirebase(cfg) {
   try {
-    const firebaseConfig = {
-
-  apiKey: "AIzaSyAe9lmn8tI66X622ltNw1oTUmSls3ScAG8",
-
-  authDomain: "live-lead-distributor.firebaseapp.com",
-
-  projectId: "live-lead-distributor",
-
-  storageBucket: "live-lead-distributor.firebasestorage.app",
-
-  messagingSenderId: "884417621256",
-
-  appId: "1:884417621256:web:362cbe9b603b96ede390bd"
-
-};
-
+    // cfg is passed in from boot() — already merged with the hardcoded defaults
+    firebaseApp = initializeApp(cfg);
     db = getDatabase(firebaseApp);
 
     // Check if any users exist
