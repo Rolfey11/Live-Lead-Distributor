@@ -1631,6 +1631,14 @@ function afterSignIn(user) {
 
   showAppShell();
   showInitialPage(user.role);
+
+  // Request browser notification permission for PCs and admins
+  if ((user.role === 'pc' || user.role === 'admin') && 'Notification' in window) {
+    if (Notification.permission === 'default') {
+      // Small delay so the UI settles before the browser prompt appears
+      setTimeout(() => Notification.requestPermission(), 1500);
+    }
+  }
 }
 
 function setHeaderForUser(p) {
@@ -1967,12 +1975,44 @@ function showIncomingPopup(lead) {
     g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
     o.start(); o.stop(ctx.currentTime + 0.4);
   } catch {}
+
+  // Browser notification (fires when tab is in background or user is elsewhere)
+  sendLeadNotification(lead);
+}
+
+let _activeLeadNotif = null;
+
+function sendLeadNotification(lead) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  // Close any previous lead notification
+  if (_activeLeadNotif) { try { _activeLeadNotif.close(); } catch {} _activeLeadNotif = null; }
+
+  const fromName = lead.fromName || 'a colleague';
+  const remaining = Math.max(0, Math.ceil((lead.expiresAt - Date.now()) / 1000));
+
+  try {
+    const n = new Notification('🔔 Live Lead Incoming!', {
+      body: `${fromName} has sent you a lead — ${remaining}s to accept`,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d97706"/><text y="44" x="32" text-anchor="middle" font-size="36" font-family="serif" fill="%231a1410">R</text></svg>',
+      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d97706"/></svg>',
+      tag: 'relay-live-lead',
+      requireInteraction: false,
+      silent: false,
+    });
+    _activeLeadNotif = n;
+    n.onclick = () => { window.focus(); n.close(); };
+    // Auto-close when the lead expires
+    const ttl = lead.expiresAt - Date.now();
+    if (ttl > 0) setTimeout(() => { try { n.close(); } catch {} }, ttl);
+  } catch {}
 }
 
 function hideIncomingPopup() {
   incomingLead = null;
   document.getElementById('incomingOverlay').classList.remove('show');
   if (pcCountdownTimer) { clearInterval(pcCountdownTimer); pcCountdownTimer = null; }
+  // Dismiss the browser notification if still showing
+  if (_activeLeadNotif) { try { _activeLeadNotif.close(); } catch {} _activeLeadNotif = null; }
 }
 
 async function acceptIncomingLead() {
