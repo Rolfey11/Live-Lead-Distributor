@@ -765,8 +765,142 @@
   .notif-banner-action { font-weight: 600; text-decoration: underline; font-size: 11px; white-space: nowrap; }
   .notif-banner.state-granted .notif-banner-action { display: none; }
 
+  /* APPEAL BANNER (admin) */
+  .appeal-banner {
+    display: none; position: sticky; top: 0; z-index: 200;
+    background: linear-gradient(90deg, #b91c1c, #dc2626);
+    color: #fff; padding: 0;
+    border-bottom: 3px solid #7f1d1d;
+    box-shadow: 0 4px 24px rgba(220,38,38,0.4);
+  }
+  .appeal-banner.show { display: block; }
+  .appeal-banner-inner {
+    max-width: 1400px; margin: 0 auto; padding: 0 32px;
+  }
+  .appeal-item {
+    display: grid; grid-template-columns: auto 1fr auto auto;
+    align-items: center; gap: 20px;
+    padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.15);
+  }
+  .appeal-item:last-child { border-bottom: none; }
+  .appeal-badge {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 4px; padding: 4px 10px;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em; white-space: nowrap;
+    animation: appealPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes appealPulse {
+    0%, 100% { background: rgba(255,255,255,0.2); }
+    50% { background: rgba(255,255,255,0.35); }
+  }
+  .appeal-text { font-size: 13px; line-height: 1.4; }
+  .appeal-text strong { font-weight: 700; }
+  .appeal-text .appeal-reason {
+    display: block; font-size: 12px; opacity: 0.85; margin-top: 2px;
+    font-style: italic;
+  }
+  .appeal-actions { display: flex; gap: 8px; }
+  .appeal-approve {
+    background: #fff; color: #b91c1c; border: none;
+    padding: 8px 18px; font-family: var(--sans); font-size: 12px;
+    font-weight: 700; cursor: pointer; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .appeal-approve:hover { background: #fef2f2; transform: scale(1.03); }
+  .appeal-decline {
+    background: transparent; color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 8px 14px; font-family: var(--sans); font-size: 12px;
+    font-weight: 600; cursor: pointer; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .appeal-decline:hover { background: rgba(255,255,255,0.1); }
+
+  /* PC HISTORY TAB */
+  .history-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  .history-box {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden;
+  }
+  .history-box-head {
+    background: var(--panel-2); padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .history-box-title {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700;
+  }
+  .history-box-count {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-mute);
+    background: var(--bg-2); padding: 3px 8px; border-radius: 2px;
+  }
+  .history-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; border-bottom: 1px solid var(--line); gap: 12px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item-info { flex: 1; min-width: 0; }
+  .history-item-from {
+    font-size: 13px; font-family: var(--serif); font-weight: 500;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .history-item-time {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-mute); margin-top: 2px;
+  }
+  .btn-appeal {
+    background: rgba(2,132,199,0.08); border: 1px solid rgba(2,132,199,0.3);
+    color: var(--info); padding: 6px 12px; font-family: var(--sans);
+    font-size: 11px; font-weight: 700; cursor: pointer; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.06em; transition: all 0.15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-appeal:hover { background: var(--info); color: #fff; border-color: var(--info); }
+  .btn-appeal:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-appeal.appealed {
+    background: rgba(217,119,6,0.08); border-color: rgba(217,119,6,0.3);
+    color: var(--busy); cursor: default;
+  }
+
+  /* APPEAL MODAL */
+  .appeal-modal-bg {
+    position: fixed; inset: 0; background: rgba(13,33,23,0.55);
+    backdrop-filter: blur(4px); display: none;
+    align-items: center; justify-content: center; z-index: 600;
+  }
+  .appeal-modal-bg.show { display: flex; }
+  .appeal-modal {
+    background: #fff; border: 1px solid var(--line-2);
+    border-radius: 6px; padding: 36px; max-width: 500px; width: 90%;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15); position: relative; overflow: hidden;
+  }
+  .appeal-modal::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--info);
+  }
+  .appeal-modal h3 {
+    font-family: var(--serif); font-size: 22px; font-weight: 500; margin-bottom: 6px;
+  }
+  .appeal-modal p { color: var(--ink-dim); font-size: 13px; margin-bottom: 20px; }
+  .appeal-textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--ink); padding: 12px 14px; font-family: var(--sans);
+    font-size: 13px; border-radius: 3px; resize: vertical; min-height: 100px;
+    transition: border-color 0.15s; line-height: 1.5;
+  }
+  .appeal-textarea:focus { outline: none; border-color: var(--info); }
+  .appeal-modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; }
+
   /* RESPONSIVE */
   @media (max-width: 900px) {
+    .history-grid { grid-template-columns: 1fr; }
+    .appeal-item { grid-template-columns: 1fr; gap: 10px; }
+  }
     .header-inner { grid-template-columns: 1fr; gap: 16px; padding: 14px 16px; }
     nav.tabs { justify-self: start; flex-wrap: wrap; }
     .header-status { justify-self: start; }
@@ -926,6 +1060,11 @@
 </div>
 
 <!-- ============== APP SHELL ============== -->
+<!-- ============== APPEAL BANNER (admin) ============== -->
+<div class="appeal-banner" id="appealBanner">
+  <div class="appeal-banner-inner" id="appealBannerInner"></div>
+</div>
+
 <div id="appShell" style="display:none">
 
 <header>
@@ -1248,7 +1387,46 @@
     </div>
   </section>
 
+  <!-- ============== PC HISTORY ============== -->
+  <section class="page" id="page-pc-history">
+    <div class="section-head" style="margin-top:0">
+      <h2 class="section-title">My Lead History</h2>
+      <span class="section-sub">Accepted, Denied &amp; Missed</span>
+    </div>
+    <div class="history-grid">
+      <div class="history-box">
+        <div class="history-box-head">
+          <span class="history-box-title">✓ Accepted Leads</span>
+          <span class="history-box-count" id="historyAcceptedCount">0</span>
+        </div>
+        <div id="historyAcceptedList"><div class="empty-state">No accepted leads yet.</div></div>
+      </div>
+      <div class="history-box">
+        <div class="history-box-head">
+          <span class="history-box-title">✕ Denied / Missed</span>
+          <span class="history-box-count" id="historyDeniedCount">0</span>
+        </div>
+        <div id="historyDeniedList"><div class="empty-state">No denied or missed leads yet.</div></div>
+      </div>
+    </div>
+  </section>
+
 </main>
+</div>
+
+<!-- ============== APPEAL MODAL ============== -->
+<div class="appeal-modal-bg" id="appealModalBg">
+  <div class="appeal-modal">
+    <h3>Submit an Appeal</h3>
+    <p>Describe why you are appealing this lead. An admin will review your request and can approve you to jump to the front of the queue for the next lead.</p>
+    <label style="font-family:var(--mono);font-size:10px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.12em;display:block;margin-bottom:8px">Reason for appeal</label>
+    <textarea class="appeal-textarea" id="appealReasonText" placeholder="Describe the reason for your appeal…"></textarea>
+    <div id="appealModalError" style="display:none;color:var(--bad);font-size:12px;margin-top:8px"></div>
+    <div class="appeal-modal-actions">
+      <button class="btn" id="appealModalCancel">Cancel</button>
+      <button class="btn btn-info" id="appealModalSubmit" style="background:var(--info);color:#fff;border-color:var(--info)">Submit Appeal</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============== INCOMING POPUP (PC) ============== -->
@@ -1826,6 +2004,7 @@ function buildNavForRole(role) {
   } else if (role === 'pc') {
     tabs = [
       { id: 'pc-dashboard', label: 'Dashboard' },
+      { id: 'pc-history', label: 'History' },
       { id: 'insights', label: 'Insights' },
       { id: 'activity', label: 'Activity' },
       { id: 'pin', label: 'My PIN' },
@@ -1862,6 +2041,7 @@ function showPage(id) {
   if (id === 'insights') renderInsights();
   if (id === 'activity') renderActivity();
   if (id === 'users') renderUsers();
+  if (id === 'pc-history') renderPCHistory();
 }
 
 // ============================================================
@@ -1919,6 +2099,15 @@ function subscribeAll() {
     handleActiveLeads(leads);
   });
   unsubscribers.push(() => off(leadsRef));
+
+  const appealsRef = ref(db, 'appeals');
+  onValue(appealsRef, (snap) => {
+    const appeals = snap.val() || {};
+    window._appealsCache = appeals;
+    renderAppealBanner(appeals);
+    renderPCHistory(); // refresh appeal button states
+  });
+  unsubscribers.push(() => off(appealsRef));
 }
 
 function cleanupSubscriptions() {
@@ -3290,6 +3479,189 @@ async function addUserFlow() {
   showToast(`${name} added · default PIN is 0000`, 'success');
 }
 
+// ============================================================
+// APPEAL BANNER (admin view)
+// ============================================================
+function renderAppealBanner(appeals) {
+  const banner = document.getElementById('appealBanner');
+  const inner = document.getElementById('appealBannerInner');
+  if (!banner || !inner) return;
+
+  const pending = Object.values(appeals).filter(a => a.status === 'pending');
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (!isAdmin || pending.length === 0) {
+    banner.classList.remove('show');
+    return;
+  }
+
+  banner.classList.add('show');
+  inner.innerHTML = pending.map(a => `
+    <div class="appeal-item">
+      <div class="appeal-badge">⚑ Appeal</div>
+      <div class="appeal-text">
+        <strong>${escapeHtml(a.pcName)}</strong> is appealing a lead they accepted
+        <span class="appeal-reason">"${escapeHtml(a.reason)}"</span>
+      </div>
+      <button class="appeal-approve" onclick="handleAppealDecision('${a.id}', 'approve')">✓ Approve</button>
+      <button class="appeal-decline" onclick="handleAppealDecision('${a.id}', 'decline')">✕ Decline</button>
+    </div>
+  `).join('');
+}
+
+async function handleAppealDecision(appealId, decision) {
+  const appealSnap = await get(ref(db, `appeals/${appealId}`));
+  if (!appealSnap.exists()) return;
+  const appeal = appealSnap.val();
+
+  await update(ref(db, `appeals/${appealId}`), {
+    status: decision === 'approve' ? 'approved' : 'declined',
+    decidedBy: currentUser.uid,
+    decidedAt: Date.now(),
+  });
+
+  if (decision === 'approve') {
+    // Move PC to front: set rotation pointer to that PC's index
+    const pcs = orderedPCs();
+    const idx = pcs.findIndex(p => p.uid === appeal.pcUid);
+    await set(ref(db, 'rotation/pointer'), idx >= 0 ? idx : 0);
+    showToast(`Appeal approved — ${appeal.pcName} is next in queue`, 'success');
+    await logEvent({ type: 'appeal_approved', byUid: currentUser.uid, byName: currentUser.name, pcUid: appeal.pcUid, pcName: appeal.pcName });
+  } else {
+    showToast(`Appeal declined for ${appeal.pcName}`, 'success');
+    await logEvent({ type: 'appeal_declined', byUid: currentUser.uid, byName: currentUser.name, pcUid: appeal.pcUid, pcName: appeal.pcName });
+  }
+}
+
+// ============================================================
+// PC HISTORY
+// ============================================================
+function renderPCHistory() {
+  if (!currentUser) return;
+  const acceptedList = document.getElementById('historyAcceptedList');
+  const deniedList = document.getElementById('historyDeniedList');
+  const acceptedCount = document.getElementById('historyAcceptedCount');
+  const deniedCount = document.getElementById('historyDeniedCount');
+  if (!acceptedList) return;
+
+  const myAccepted = events.filter(e => e.type === 'lead_accepted' && e.toUid === currentUser.uid);
+  const myDenied = events.filter(e =>
+    (e.type === 'lead_denied' || e.type === 'lead_timeout') && e.toUid === currentUser.uid
+  );
+
+  acceptedCount.textContent = myAccepted.length;
+  deniedCount.textContent = myDenied.length;
+
+  const appealsCache = window._appealsCache || {};
+
+  if (myAccepted.length === 0) {
+    acceptedList.innerHTML = `<div class="empty-state">No accepted leads yet.</div>`;
+  } else {
+    acceptedList.innerHTML = myAccepted.map(e => {
+      const eventKey = e.leadId || e.id;
+      const existingAppeal = Object.values(appealsCache).find(a =>
+        a.pcUid === currentUser.uid && a.leadEventId === eventKey
+      );
+      let btnHtml = '';
+      if (!existingAppeal) {
+        btnHtml = `<button class="btn-appeal" onclick="openAppealModal('${eventKey}', '${escapeHtml(e.fromName || 'CC').replace(/'/g,"\\'")}')">Appeal</button>`;
+      } else if (existingAppeal.status === 'pending') {
+        btnHtml = `<button class="btn-appeal appealed" disabled>Pending…</button>`;
+      } else if (existingAppeal.status === 'approved') {
+        btnHtml = `<button class="btn-appeal appealed" disabled style="color:var(--good);border-color:rgba(0,166,81,0.3);background:rgba(0,166,81,0.08)">Approved ✓</button>`;
+      } else if (existingAppeal.status === 'declined') {
+        btnHtml = `<button class="btn-appeal appealed" disabled style="color:var(--bad);border-color:rgba(220,38,38,0.25);background:rgba(220,38,38,0.06)">Declined</button>`;
+      }
+      return `<div class="history-item">
+        <div class="history-item-info">
+          <div class="history-item-from">From ${escapeHtml(e.fromName || '—')}</div>
+          <div class="history-item-time">${formatTime(e.time)}</div>
+        </div>
+        ${btnHtml}
+      </div>`;
+    }).join('');
+  }
+
+  if (myDenied.length === 0) {
+    deniedList.innerHTML = `<div class="empty-state">No denied or missed leads yet.</div>`;
+  } else {
+    deniedList.innerHTML = myDenied.map(e => {
+      const tag = e.type === 'lead_timeout' ? 'Missed' : 'Denied';
+      const tagColor = e.type === 'lead_timeout' ? 'var(--busy)' : 'var(--bad)';
+      const tagBg = e.type === 'lead_timeout' ? 'rgba(217,119,6,0.08)' : 'rgba(220,38,38,0.06)';
+      return `<div class="history-item">
+        <div class="history-item-info">
+          <div class="history-item-from">Lead from ${escapeHtml(e.fromName || '—')}</div>
+          <div class="history-item-time">${formatTime(e.time)}</div>
+        </div>
+        <span style="font-family:var(--mono);font-size:10px;color:${tagColor};text-transform:uppercase;letter-spacing:0.08em;padding:4px 8px;background:${tagBg};border-radius:2px;flex-shrink:0">${tag}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ============================================================
+// APPEAL MODAL
+// ============================================================
+let _appealTargetEventId = null;
+let _appealTargetFromName = null;
+
+function openAppealModal(eventId, fromName) {
+  _appealTargetEventId = eventId;
+  _appealTargetFromName = fromName;
+  document.getElementById('appealReasonText').value = '';
+  document.getElementById('appealModalError').style.display = 'none';
+  document.getElementById('appealModalBg').classList.add('show');
+  setTimeout(() => document.getElementById('appealReasonText').focus(), 100);
+}
+
+function closeAppealModal() {
+  document.getElementById('appealModalBg').classList.remove('show');
+  _appealTargetEventId = null;
+  _appealTargetFromName = null;
+}
+
+async function submitAppeal() {
+  const reason = document.getElementById('appealReasonText').value.trim();
+  const errEl = document.getElementById('appealModalError');
+  if (!reason) {
+    errEl.textContent = 'Please describe the reason for your appeal.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!_appealTargetEventId) return;
+
+  const appealsCache = window._appealsCache || {};
+  const exists = Object.values(appealsCache).find(a =>
+    a.pcUid === currentUser.uid && a.leadEventId === _appealTargetEventId && a.status === 'pending'
+  );
+  if (exists) {
+    errEl.textContent = 'You have already submitted an appeal for this lead.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const appealId = 'appeal_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  await set(ref(db, `appeals/${appealId}`), {
+    id: appealId,
+    pcUid: currentUser.uid,
+    pcName: currentUser.name,
+    leadEventId: _appealTargetEventId,
+    fromName: _appealTargetFromName || '—',
+    reason,
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+
+  closeAppealModal();
+  showToast('Appeal submitted — an admin will review it shortly', 'success');
+}
+
+// Expose appeal functions globally for onclick handlers in dynamic HTML
+window.openAppealModal = openAppealModal;
+window.closeAppealModal = closeAppealModal;
+window.submitAppeal = submitAppeal;
+window.handleAppealDecision = handleAppealDecision;
+
 // BOOT
 boot();
 </script>
@@ -3315,6 +3687,12 @@ boot();
       if (result === 'granted') showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
     });
     document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
+
+    document.getElementById('appealModalCancel').addEventListener('click', closeAppealModal);
+    document.getElementById('appealModalBg').addEventListener('click', (e) => {
+      if (e.target.id === 'appealModalBg') closeAppealModal();
+    });
+    document.getElementById('appealModalSubmit').addEventListener('click', submitAppeal);
   </script>
 
 </body>
