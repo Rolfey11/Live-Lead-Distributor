@@ -751,31 +751,6 @@
   .queue-pip.you { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(0,166,81,0.5); transform: scale(1.3); }
   .queue-pip.offline-pip { background: transparent; border-color: var(--line-2); opacity: 0.4; }
 
-  /* NOTIFICATION PROMPT BANNER */
-  .notif-prompt {
-    display: none; align-items: center; gap: 14px;
-    background: rgba(0,166,81,0.07); border: 1px solid rgba(0,166,81,0.25);
-    border-radius: 6px; padding: 14px 18px; margin-bottom: 20px;
-    font-size: 13px;
-  }
-  .notif-prompt.show { display: flex; }
-  .notif-prompt-icon { font-size: 22px; flex-shrink: 0; }
-  .notif-prompt-text { flex: 1; color: var(--ink-dim); line-height: 1.4; }
-  .notif-prompt-text strong { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; }
-  .notif-prompt-btn {
-    background: var(--accent); color: #fff; border: none;
-    padding: 8px 16px; border-radius: 4px; font-size: 12px;
-    font-weight: 600; cursor: pointer; white-space: nowrap;
-    font-family: var(--sans); transition: background 0.15s;
-  }
-  .notif-prompt-btn:hover { background: var(--accent-2); }
-  .notif-prompt-dismiss {
-    background: none; border: none; color: var(--ink-mute);
-    font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
-    flex-shrink: 0;
-  }
-  .notif-prompt-dismiss:hover { color: var(--ink); }
-
   /* RESPONSIVE */
   @media (max-width: 900px) {
     .header-inner { grid-template-columns: 1fr; gap: 16px; padding: 14px 16px; }
@@ -1016,16 +991,6 @@
         <div class="hero-stat"><div class="hero-stat-label">All-Time</div><div class="hero-stat-value" id="pcStatTotal">0</div></div>
         <div class="hero-stat"><div class="hero-stat-label">Acceptance</div><div class="hero-stat-value" id="pcStatAcceptance">—</div></div>
       </div>
-    </div>
-
-    <div class="notif-prompt" id="notifPrompt">
-      <div class="notif-prompt-icon">🔔</div>
-      <div class="notif-prompt-text">
-        <strong>Enable desktop notifications</strong>
-        Get a pop-up alert when a live lead comes in, even if you're in another tab or window.
-      </div>
-      <button class="notif-prompt-btn" id="notifPromptBtn">Enable</button>
-      <button class="notif-prompt-dismiss" id="notifPromptDismiss" title="Dismiss">×</button>
     </div>
 
     <div class="pc-status-card">
@@ -1383,12 +1348,66 @@ function boot() {
   bindSetupUI();
   bindPinChangeUI();
   bindAppShellUI();
-  bindNotifPrompt();
+  bindNotifModal();
 
   // Always use hardcoded config — setup screen is bypassed.
   // (Setup UI is still bound above so the Reconfigure flow doesn't crash if accessed.)
   saveCfg(HARDCODED_FIREBASE_CFG);
   initFirebase(HARDCODED_FIREBASE_CFG);
+}
+
+function bindNotifModal() {
+  document.getElementById('notifModalEnable').addEventListener('click', async () => {
+    if (Notification.permission === 'denied') {
+      // Can't re-request once denied — show instructions instead
+      document.getElementById('notifModalTitle').textContent = 'Notifications are blocked';
+      document.getElementById('notifModalBody').innerHTML =
+        'Your browser has blocked notifications for this page. To fix it:<br><br>' +
+        '<strong>Chrome/Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
+        '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
+      document.getElementById('notifModalEnable').style.display = 'none';
+      document.getElementById('notifModalSkip').textContent = 'OK, got it';
+      return;
+    }
+    const result = await Notification.requestPermission();
+    closeNotifModal();
+    if (result === 'granted') {
+      showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
+    }
+  });
+
+  document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
+}
+
+function showNotifModal() {
+  // Don't show if already granted
+  if (Notification.permission === 'granted') return;
+
+  // Reset modal to default state each time (in case it was in denied-instructions state before)
+  document.getElementById('notifModalTitle').textContent = 'Enable desktop notifications';
+  document.getElementById('notifModalBody').innerHTML =
+    'Get a pop-up alert the moment a live lead comes in, even if you\'re in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.';
+  document.getElementById('notifModalEnable').style.display = '';
+  document.getElementById('notifModalEnable').textContent = 'Enable Notifications';
+  document.getElementById('notifModalSkip').textContent = 'Not now';
+
+  // If already denied, go straight to instructions
+  if (Notification.permission === 'denied') {
+    document.getElementById('notifModalTitle').textContent = 'Notifications are blocked';
+    document.getElementById('notifModalBody').innerHTML =
+      'Your browser has blocked notifications for this page. To fix it:<br><br>' +
+      '<strong>Chrome/Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
+      '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
+    document.getElementById('notifModalEnable').style.display = 'none';
+    document.getElementById('notifModalSkip').textContent = 'OK, got it';
+  }
+
+  const bg = document.getElementById('notifModalBg');
+  bg.style.display = 'flex';
+}
+
+function closeNotifModal() {
+  document.getElementById('notifModalBg').style.display = 'none';
 }
 
 function loadCfg() {
@@ -1748,6 +1767,11 @@ function afterSignIn(user) {
 
   showAppShell();
   showInitialPage(user.role);
+
+  // Show notification permission modal on every login for PCs and admins
+  if ((user.role === 'pc' || user.role === 'admin') && 'Notification' in window) {
+    setTimeout(() => showNotifModal(), 800);
+  }
 }
 
 function setHeaderForUser(p) {
@@ -2370,43 +2394,10 @@ function renderPCDashboard() {
     document.getElementById('pcGreeting').textContent = 'ready.';
   }
 
-  // Show notification prompt banner if permission not yet granted
-  updateNotifPrompt();
-
   // Queue Position
   renderQueuePosition(me);
 
   renderPCFeed();
-}
-
-function updateNotifPrompt() {
-  const banner = document.getElementById('notifPrompt');
-  if (!banner) return;
-  // Show only if supported and not yet decided
-  const show = 'Notification' in window && Notification.permission === 'default';
-  banner.classList.toggle('show', show);
-}
-
-function bindNotifPrompt() {
-  const enableBtn = document.getElementById('notifPromptBtn');
-  const dismissBtn = document.getElementById('notifPromptDismiss');
-  if (!enableBtn || !dismissBtn) return;
-
-  enableBtn.addEventListener('click', async () => {
-    const result = await Notification.requestPermission();
-    if (result === 'granted') {
-      showToast('Notifications enabled — you\'ll be alerted when a lead comes in', 'success');
-    } else if (result === 'denied') {
-      showToast('Notifications blocked. Enable them in your browser settings.', 'warn');
-    }
-    updateNotifPrompt(); // hide banner now a decision has been made
-  });
-
-  dismissBtn.addEventListener('click', () => {
-    // Soft dismiss for this session — hides the banner without requesting permission
-    const banner = document.getElementById('notifPrompt');
-    if (banner) banner.classList.remove('show');
-  });
 }
 
 function renderQueuePosition(me) {
@@ -3238,6 +3229,19 @@ async function addUserFlow() {
 // BOOT
 boot();
 </script>
+
+  <!-- NOTIFICATION PERMISSION MODAL -->
+  <div id="notifModalBg" style="display:none; position:fixed; inset:0; background:rgba(13,33,23,0.55); backdrop-filter:blur(4px); z-index:2000; align-items:center; justify-content:center;">
+    <div id="notifModal" style="background:#fff; border:2px solid var(--accent); border-radius:8px; padding:36px 32px; max-width:420px; width:90%; box-shadow:0 8px 40px rgba(0,166,81,0.15); text-align:center; position:relative;">
+      <div style="font-size:40px; margin-bottom:14px;">🔔</div>
+      <h2 style="font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); margin-bottom:10px;" id="notifModalTitle">Enable desktop notifications</h2>
+      <p style="font-size:13px; color:var(--ink-dim); line-height:1.6; margin-bottom:24px;" id="notifModalBody">Get a pop-up alert the moment a live lead comes in, even if you're in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.</p>
+      <div style="display:flex; gap:10px; justify-content:center;" id="notifModalBtns">
+        <button id="notifModalEnable" style="background:var(--accent); color:#fff; border:none; padding:11px 28px; border-radius:4px; font-size:14px; font-weight:600; cursor:pointer; font-family:var(--sans);">Enable Notifications</button>
+        <button id="notifModalSkip" style="background:none; border:1px solid var(--line-2); color:var(--ink-dim); padding:11px 20px; border-radius:4px; font-size:14px; cursor:pointer; font-family:var(--sans);">Not now</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
