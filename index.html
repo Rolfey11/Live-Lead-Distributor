@@ -1372,16 +1372,7 @@ function initFirebase(cfg) {
       if (!hasUsers) {
         document.getElementById('firstAdminNotice').style.display = 'block';
       }
-      // Try resuming session
-      const sessionUid = localStorage.getItem(LS_SESSION);
-      if (sessionUid && hasUsers) {
-        const u = (snap.val() || {})[sessionUid];
-        if (u) {
-          currentUser = u;
-          afterSignIn(u);
-          return;
-        }
-      }
+      // Always show login screen — no auto session restore
       showLoginScreen();
       populateUserSelect();
     }).catch(err => {
