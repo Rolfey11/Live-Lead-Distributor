@@ -3656,11 +3656,14 @@ async function submitAppeal() {
   showToast('Appeal submitted — an admin will review it shortly', 'success');
 }
 
-// Expose appeal functions globally for onclick handlers in dynamic HTML
+// Expose module functions globally — needed by non-module script blocks and dynamic onclick handlers
 window.openAppealModal = openAppealModal;
 window.closeAppealModal = closeAppealModal;
 window.submitAppeal = submitAppeal;
 window.handleAppealDecision = handleAppealDecision;
+window.closeNotifModal = closeNotifModal;
+window.updateNotifBanner = updateNotifBanner;
+window.showToast = showToast;
 
 // BOOT
 boot();
