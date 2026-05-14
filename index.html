@@ -127,38 +127,6 @@
   }
   .btn-link:hover { color: var(--ink); }
 
-  /* NOTIFICATION STATUS BANNER */
-  .notif-banner {
-    display: none; align-items: center; gap: 10px;
-    padding: 7px 32px; font-size: 12px; font-family: var(--sans);
-    border-bottom: 1px solid; cursor: default;
-  }
-  .notif-banner.show { display: flex; }
-  .notif-banner.state-granted {
-    background: rgba(0,166,81,0.07);
-    border-color: rgba(0,166,81,0.2);
-    color: var(--good);
-  }
-  .notif-banner.state-denied {
-    background: rgba(220,38,38,0.06);
-    border-color: rgba(220,38,38,0.2);
-    color: var(--bad);
-    cursor: pointer;
-  }
-  .notif-banner.state-default {
-    background: rgba(217,119,6,0.07);
-    border-color: rgba(217,119,6,0.2);
-    color: var(--busy);
-    cursor: pointer;
-  }
-  .notif-banner-icon { font-size: 13px; flex-shrink: 0; }
-  .notif-banner-text { flex: 1; }
-  .notif-banner-action {
-    font-weight: 600; text-decoration: underline; font-size: 11px;
-    white-space: nowrap; opacity: 0.85;
-  }
-  .notif-banner.state-granted .notif-banner-action { display: none; }
-
   /* VIEW-AS (admin) */
   .view-as-bar {
     background: linear-gradient(90deg, rgba(0,166,81,0.08), transparent);
@@ -783,6 +751,20 @@
   .queue-pip.you { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(0,166,81,0.5); transform: scale(1.3); }
   .queue-pip.offline-pip { background: transparent; border-color: var(--line-2); opacity: 0.4; }
 
+  /* NOTIFICATION STATUS BANNER */
+  .notif-banner {
+    display: none; align-items: center; gap: 10px;
+    padding: 7px 32px; font-size: 12px; font-family: var(--sans);
+    border-bottom: 1px solid;
+  }
+  .notif-banner.show { display: flex; }
+  .notif-banner.state-granted { background: rgba(0,166,81,0.07); border-color: rgba(0,166,81,0.2); color: var(--good); }
+  .notif-banner.state-denied { background: rgba(220,38,38,0.06); border-color: rgba(220,38,38,0.2); color: var(--bad); cursor: pointer; }
+  .notif-banner.state-default { background: rgba(217,119,6,0.07); border-color: rgba(217,119,6,0.2); color: var(--busy); cursor: pointer; }
+  .notif-banner-text { flex: 1; }
+  .notif-banner-action { font-weight: 600; text-decoration: underline; font-size: 11px; white-space: nowrap; }
+  .notif-banner.state-granted .notif-banner-action { display: none; }
+
   /* RESPONSIVE */
   @media (max-width: 900px) {
     .header-inner { grid-template-columns: 1fr; gap: 16px; padding: 14px 16px; }
@@ -977,9 +959,9 @@
     <span style="color:var(--ink-mute)">Switch perspective without leaving admin privileges</span>
   </div>
 
-  <!-- NOTIFICATION STATUS BANNER (pc + admin only) -->
+  <!-- NOTIFICATION STATUS BANNER -->
   <div class="notif-banner" id="notifBanner">
-    <span class="notif-banner-icon" id="notifBannerIcon"></span>
+    <span id="notifBannerIcon" style="margin-right:4px"></span>
     <span class="notif-banner-text" id="notifBannerText"></span>
     <span class="notif-banner-action" id="notifBannerAction"></span>
   </div>
@@ -1387,29 +1369,15 @@ function boot() {
   bindSetupUI();
   bindPinChangeUI();
   bindAppShellUI();
-  bindNotifBanner();
 
   // Always use hardcoded config — setup screen is bypassed.
-  // (Setup UI is still bound above so the Reconfigure flow doesn't crash if accessed.)
   saveCfg(HARDCODED_FIREBASE_CFG);
   initFirebase(HARDCODED_FIREBASE_CFG);
 }
 
 // ============================================================
-// NOTIFICATION STATUS BANNER
+// NOTIFICATION BANNER + MODAL
 // ============================================================
-function bindNotifBanner() {
-  const banner = document.getElementById('notifBanner');
-  if (!banner) return;
-
-  // Clicking the banner when denied or default opens the permission modal
-  banner.addEventListener('click', () => {
-    if (Notification.permission !== 'granted') {
-      showNotifModal();
-    }
-  });
-}
-
 function updateNotifBanner() {
   const banner = document.getElementById('notifBanner');
   const icon = document.getElementById('notifBannerIcon');
@@ -1417,12 +1385,8 @@ function updateNotifBanner() {
   const action = document.getElementById('notifBannerAction');
   if (!banner || !currentUser) return;
 
-  // Only show for PC and admin roles
-  const relevantRole = currentUser.role === 'pc' || currentUser.role === 'admin';
-  if (!relevantRole || !('Notification' in window)) {
-    banner.classList.remove('show');
-    return;
-  }
+  const relevant = currentUser.role === 'pc' || currentUser.role === 'admin';
+  if (!relevant || !('Notification' in window)) { banner.classList.remove('show'); return; }
 
   banner.classList.remove('state-granted', 'state-denied', 'state-default');
 
@@ -1436,13 +1400,41 @@ function updateNotifBanner() {
     icon.textContent = '🔕';
     text.textContent = 'Desktop notifications are blocked — you won\'t receive lead alerts.';
     action.textContent = 'Click here to fix →';
+    banner.onclick = showNotifModal;
   } else {
-    // default — not yet decided
     banner.classList.add('show', 'state-default');
     icon.textContent = '🔔';
     text.textContent = 'Desktop notifications are not enabled — you may miss incoming leads.';
     action.textContent = 'Click here to enable →';
+    banner.onclick = showNotifModal;
   }
+}
+
+function showNotifModal() {
+  if (Notification.permission === 'granted') return;
+  const title = document.getElementById('notifModalTitle');
+  const body = document.getElementById('notifModalBody');
+  const enableBtn = document.getElementById('notifModalEnable');
+  const skipBtn = document.getElementById('notifModalSkip');
+  // Reset
+  title.textContent = 'Enable desktop notifications';
+  body.innerHTML = 'Get a pop-up alert the moment a live lead comes in, even if you\'re in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.';
+  enableBtn.style.display = '';
+  enableBtn.textContent = 'Enable Notifications';
+  skipBtn.textContent = 'Not now';
+  if (Notification.permission === 'denied') {
+    title.textContent = 'Notifications are blocked';
+    body.innerHTML = 'Your browser has blocked notifications for this page. To fix it:<br><br>' +
+      '<strong>Chrome / Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
+      '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
+    enableBtn.style.display = 'none';
+    skipBtn.textContent = 'OK, got it';
+  }
+  document.getElementById('notifModalBg').style.display = 'flex';
+}
+
+function closeNotifModal() {
+  document.getElementById('notifModalBg').style.display = 'none';
 }
 
 function loadCfg() {
@@ -2160,12 +2152,11 @@ function sendLeadNotification(lead) {
   const remaining = Math.max(0, Math.ceil((lead.expiresAt - Date.now()) / 1000));
 
   try {
+    // Note: data: URIs are blocked as notification icons in Chrome — omit icon entirely
     const n = new Notification('🔔 Live Lead Incoming!', {
       body: `${fromName} has sent you a lead — ${remaining}s to accept`,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%2300a651"/><text y="44" x="32" text-anchor="middle" font-size="36" font-family="serif" fill="%23ffffff">R</text></svg>',
-      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%2300a651"/></svg>',
       tag: 'relay-live-lead',
-      requireInteraction: false,
+      requireInteraction: true,
       silent: false,
     });
     _activeLeadNotif = n;
@@ -2173,7 +2164,9 @@ function sendLeadNotification(lead) {
     // Auto-close when the lead expires
     const ttl = lead.expiresAt - Date.now();
     if (ttl > 0) setTimeout(() => { try { n.close(); } catch {} }, ttl);
-  } catch {}
+  } catch (err) {
+    console.error('Notification failed:', err);
+  }
 }
 
 function hideIncomingPopup() {
@@ -3271,7 +3264,7 @@ boot();
     <div style="background:#fff; border:2px solid var(--accent); border-radius:8px; padding:36px 32px; max-width:420px; width:90%; box-shadow:0 8px 40px rgba(0,166,81,0.15); text-align:center;">
       <div style="font-size:40px; margin-bottom:14px;">🔔</div>
       <h2 style="font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); margin-bottom:10px;" id="notifModalTitle">Enable desktop notifications</h2>
-      <p style="font-size:13px; color:var(--ink-dim); line-height:1.6; margin-bottom:24px;" id="notifModalBody">Get a pop-up alert the moment a live lead comes in, even if you're in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.</p>
+      <p style="font-size:13px; color:var(--ink-dim); line-height:1.6; margin-bottom:24px;" id="notifModalBody"></p>
       <div style="display:flex; gap:10px; justify-content:center;">
         <button id="notifModalEnable" style="background:var(--accent); color:#fff; border:none; padding:11px 28px; border-radius:4px; font-size:14px; font-weight:600; cursor:pointer; font-family:var(--sans);">Enable Notifications</button>
         <button id="notifModalSkip" style="background:none; border:1px solid var(--line-2); color:var(--ink-dim); padding:11px 20px; border-radius:4px; font-size:14px; cursor:pointer; font-family:var(--sans);">Not now</button>
@@ -3280,48 +3273,14 @@ boot();
   </div>
 
   <script>
-  // Notification modal
-  document.getElementById('notifModalEnable').addEventListener('click', async () => {
-    if (Notification.permission === 'denied') {
-      document.getElementById('notifModalTitle').textContent = 'Notifications are blocked';
-      document.getElementById('notifModalBody').innerHTML =
-        'Your browser has blocked notifications for this page. To fix it:<br><br>' +
-        '<strong>Chrome / Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
-        '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
-      document.getElementById('notifModalEnable').style.display = 'none';
-      document.getElementById('notifModalSkip').textContent = 'OK, got it';
-      return;
-    }
-    const result = await Notification.requestPermission();
-    closeNotifModal();
-    updateNotifBanner();
-    if (result === 'granted') showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
-  });
-  document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
-
-  function showNotifModal() {
-    if (Notification.permission === 'granted') return;
-    // Reset to default state
-    document.getElementById('notifModalTitle').textContent = 'Enable desktop notifications';
-    document.getElementById('notifModalBody').innerHTML = 'Get a pop-up alert the moment a live lead comes in, even if you\'re in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.';
-    document.getElementById('notifModalEnable').style.display = '';
-    document.getElementById('notifModalEnable').textContent = 'Enable Notifications';
-    document.getElementById('notifModalSkip').textContent = 'Not now';
-    if (Notification.permission === 'denied') {
-      document.getElementById('notifModalTitle').textContent = 'Notifications are blocked';
-      document.getElementById('notifModalBody').innerHTML =
-        'Your browser has blocked notifications for this page. To fix it:<br><br>' +
-        '<strong>Chrome / Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
-        '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
-      document.getElementById('notifModalEnable').style.display = 'none';
-      document.getElementById('notifModalSkip').textContent = 'OK, got it';
-    }
-    document.getElementById('notifModalBg').style.display = 'flex';
-  }
-
-  function closeNotifModal() {
-    document.getElementById('notifModalBg').style.display = 'none';
-  }
+    document.getElementById('notifModalEnable').addEventListener('click', async () => {
+      if (Notification.permission === 'denied') return; // button hidden when denied
+      const result = await Notification.requestPermission();
+      closeNotifModal();
+      updateNotifBanner();
+      if (result === 'granted') showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
+    });
+    document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
   </script>
 
 </body>
