@@ -3656,47 +3656,45 @@ async function submitAppeal() {
   showToast('Appeal submitted — an admin will review it shortly', 'success');
 }
 
-// Expose module functions globally — needed by non-module script blocks and dynamic onclick handlers
+// Expose appeal + dynamic-onclick functions globally
 window.openAppealModal = openAppealModal;
 window.closeAppealModal = closeAppealModal;
 window.submitAppeal = submitAppeal;
 window.handleAppealDecision = handleAppealDecision;
-window.closeNotifModal = closeNotifModal;
-window.updateNotifBanner = updateNotifBanner;
-window.showToast = showToast;
+
+// Bind notification modal buttons (must live in module scope where these functions are defined)
+  document.getElementById('notifModalEnable').addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
+    const result = await Notification.requestPermission();
+    closeNotifModal();
+    updateNotifBanner();
+    if (result === 'granted') showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
+  });
+  document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
+
+  // Bind appeal modal buttons
+  document.getElementById('appealModalCancel').addEventListener('click', closeAppealModal);
+  document.getElementById('appealModalBg').addEventListener('click', (e) => {
+    if (e.target.id === 'appealModalBg') closeAppealModal();
+  });
+  document.getElementById('appealModalSubmit').addEventListener('click', submitAppeal);
 
 // BOOT
 boot();
 </script>
 
-  <!-- NOTIFICATION PERMISSION MODAL -->
-  <div id="notifModalBg" style="display:none; position:fixed; inset:0; background:rgba(13,33,23,0.55); backdrop-filter:blur(4px); z-index:2000; align-items:center; justify-content:center;">
-    <div style="background:#fff; border:2px solid var(--accent); border-radius:8px; padding:36px 32px; max-width:420px; width:90%; box-shadow:0 8px 40px rgba(0,166,81,0.15); text-align:center;">
-      <div style="font-size:40px; margin-bottom:14px;">🔔</div>
-      <h2 style="font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); margin-bottom:10px;" id="notifModalTitle">Enable desktop notifications</h2>
-      <p style="font-size:13px; color:var(--ink-dim); line-height:1.6; margin-bottom:24px;" id="notifModalBody"></p>
-      <div style="display:flex; gap:10px; justify-content:center;">
-        <button id="notifModalEnable" style="background:var(--accent); color:#fff; border:none; padding:11px 28px; border-radius:4px; font-size:14px; font-weight:600; cursor:pointer; font-family:var(--sans);">Enable Notifications</button>
-        <button id="notifModalSkip" style="background:none; border:1px solid var(--line-2); color:var(--ink-dim); padding:11px 20px; border-radius:4px; font-size:14px; cursor:pointer; font-family:var(--sans);">Not now</button>
-      </div>
+<!-- NOTIFICATION PERMISSION MODAL -->
+<div id="notifModalBg" style="display:none; position:fixed; inset:0; background:rgba(13,33,23,0.55); backdrop-filter:blur(4px); z-index:2000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border:2px solid var(--accent); border-radius:8px; padding:36px 32px; max-width:420px; width:90%; box-shadow:0 8px 40px rgba(0,166,81,0.15); text-align:center;">
+    <div style="font-size:40px; margin-bottom:14px;">🔔</div>
+    <h2 style="font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); margin-bottom:10px;" id="notifModalTitle">Enable desktop notifications</h2>
+    <p style="font-size:13px; color:var(--ink-dim); line-height:1.6; margin-bottom:24px;" id="notifModalBody"></p>
+    <div style="display:flex; gap:10px; justify-content:center;">
+      <button id="notifModalEnable" style="background:var(--accent); color:#fff; border:none; padding:11px 28px; border-radius:4px; font-size:14px; font-weight:600; cursor:pointer; font-family:var(--sans);">Enable Notifications</button>
+      <button id="notifModalSkip" style="background:none; border:1px solid var(--line-2); color:var(--ink-dim); padding:11px 20px; border-radius:4px; font-size:14px; cursor:pointer; font-family:var(--sans);">Not now</button>
     </div>
   </div>
-  <script>
-    document.getElementById('notifModalEnable').addEventListener('click', async () => {
-      if (Notification.permission === 'denied') return;
-      const result = await Notification.requestPermission();
-      closeNotifModal();
-      updateNotifBanner();
-      if (result === 'granted') showToast('Notifications enabled — you\'ll be alerted for every incoming lead', 'success');
-    });
-    document.getElementById('notifModalSkip').addEventListener('click', closeNotifModal);
-
-    document.getElementById('appealModalCancel').addEventListener('click', closeAppealModal);
-    document.getElementById('appealModalBg').addEventListener('click', (e) => {
-      if (e.target.id === 'appealModalBg') closeAppealModal();
-    });
-    document.getElementById('appealModalSubmit').addEventListener('click', submitAppeal);
-  </script>
+</div>
 
 </body>
 </html>
