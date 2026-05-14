@@ -1363,49 +1363,29 @@ function makeSalt() {
 // ============================================================
 // BOOT
 // ============================================================
-function boot() {
-  bindLoginUI();
-  bindFirstAdminUI();
-  bindSetupUI();
-  bindPinChangeUI();
-  bindAppShellUI();
-
-  // Always use hardcoded config — setup screen is bypassed.
-  saveCfg(HARDCODED_FIREBASE_CFG);
-  initFirebase(HARDCODED_FIREBASE_CFG);
-}
-
 // ============================================================
 // NOTIFICATION BANNER + MODAL
 // ============================================================
 function updateNotifBanner() {
   const banner = document.getElementById('notifBanner');
+  if (!banner || !currentUser) return;
+  const relevant = currentUser.role === 'pc' || currentUser.role === 'admin';
+  if (!relevant || !('Notification' in window)) { banner.classList.remove('show'); return; }
+  banner.classList.remove('state-granted', 'state-denied', 'state-default');
+  banner.onclick = null;
   const icon = document.getElementById('notifBannerIcon');
   const text = document.getElementById('notifBannerText');
   const action = document.getElementById('notifBannerAction');
-  if (!banner || !currentUser) return;
-
-  const relevant = currentUser.role === 'pc' || currentUser.role === 'admin';
-  if (!relevant || !('Notification' in window)) { banner.classList.remove('show'); return; }
-
-  banner.classList.remove('state-granted', 'state-denied', 'state-default');
-
   if (Notification.permission === 'granted') {
     banner.classList.add('show', 'state-granted');
-    icon.textContent = '🔔';
-    text.textContent = 'Desktop notifications are enabled — you\'ll be alerted for every incoming lead.';
-    action.textContent = '';
+    icon.textContent = '🔔'; text.textContent = 'Desktop notifications are enabled — you\'ll be alerted for every incoming lead.'; action.textContent = '';
   } else if (Notification.permission === 'denied') {
     banner.classList.add('show', 'state-denied');
-    icon.textContent = '🔕';
-    text.textContent = 'Desktop notifications are blocked — you won\'t receive lead alerts.';
-    action.textContent = 'Click here to fix →';
+    icon.textContent = '🔕'; text.textContent = 'Desktop notifications are blocked — you won\'t receive lead alerts.'; action.textContent = 'Click here to fix →';
     banner.onclick = showNotifModal;
   } else {
     banner.classList.add('show', 'state-default');
-    icon.textContent = '🔔';
-    text.textContent = 'Desktop notifications are not enabled — you may miss incoming leads.';
-    action.textContent = 'Click here to enable →';
+    icon.textContent = '🔔'; text.textContent = 'Desktop notifications are not enabled — you may miss incoming leads.'; action.textContent = 'Click here to enable →';
     banner.onclick = showNotifModal;
   }
 }
@@ -1416,25 +1396,31 @@ function showNotifModal() {
   const body = document.getElementById('notifModalBody');
   const enableBtn = document.getElementById('notifModalEnable');
   const skipBtn = document.getElementById('notifModalSkip');
-  // Reset
   title.textContent = 'Enable desktop notifications';
   body.innerHTML = 'Get a pop-up alert the moment a live lead comes in, even if you\'re in another tab or window. Click <strong>Enable</strong> then allow when your browser asks.';
-  enableBtn.style.display = '';
-  enableBtn.textContent = 'Enable Notifications';
-  skipBtn.textContent = 'Not now';
+  enableBtn.style.display = ''; enableBtn.textContent = 'Enable Notifications'; skipBtn.textContent = 'Not now';
   if (Notification.permission === 'denied') {
     title.textContent = 'Notifications are blocked';
-    body.innerHTML = 'Your browser has blocked notifications for this page. To fix it:<br><br>' +
-      '<strong>Chrome / Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br>' +
-      '<strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
-    enableBtn.style.display = 'none';
-    skipBtn.textContent = 'OK, got it';
+    body.innerHTML = 'Your browser has blocked notifications for this page. To fix it:<br><br><strong>Chrome / Edge:</strong> Click the 🔒 padlock in the address bar → Notifications → Allow<br><br><strong>Firefox:</strong> Click the shield icon → Permissions → Allow Notifications';
+    enableBtn.style.display = 'none'; skipBtn.textContent = 'OK, got it';
   }
   document.getElementById('notifModalBg').style.display = 'flex';
 }
 
-function closeNotifModal() {
-  document.getElementById('notifModalBg').style.display = 'none';
+function closeNotifModal() { document.getElementById('notifModalBg').style.display = 'none'; }
+
+function boot() {
+  bindLoginUI();
+  bindFirstAdminUI();
+  bindSetupUI();
+  bindPinChangeUI();
+  bindAppShellUI();
+  registerNotifServiceWorker();
+
+  // Always use hardcoded config — setup screen is bypassed.
+  // (Setup UI is still bound above so the Reconfigure flow doesn't crash if accessed.)
+  saveCfg(HARDCODED_FIREBASE_CFG);
+  initFirebase(HARDCODED_FIREBASE_CFG);
 }
 
 function loadCfg() {
@@ -2142,27 +2128,72 @@ function showIncomingPopup(lead) {
 }
 
 let _activeLeadNotif = null;
+let _swRegistration = null;
 
-function sendLeadNotification(lead) {
+// Register a minimal Service Worker via Blob so notifications fire even when
+// the window is minimised or the tab is in the background.
+// SW notifications bypass Chrome's "tab is focused" suppression that affects new Notification().
+async function registerNotifServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const swCode = `
+      self.addEventListener('notificationclick', e => {
+        e.notification.close();
+        e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+          for (const c of list) { if ('focus' in c) return c.focus(); }
+          if (clients.openWindow) return clients.openWindow('/');
+        }));
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    _swRegistration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    console.log('Relay SW registered for notifications');
+  } catch (err) {
+    console.warn('SW registration failed, falling back to Notification API:', err);
+  }
+}
+
+async function sendLeadNotification(lead) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  // Close any previous lead notification
-  if (_activeLeadNotif) { try { _activeLeadNotif.close(); } catch {} _activeLeadNotif = null; }
 
   const fromName = lead.fromName || 'a colleague';
   const remaining = Math.max(0, Math.ceil((lead.expiresAt - Date.now()) / 1000));
+  const ttl = lead.expiresAt - Date.now();
 
+  const options = {
+    body: `${fromName} has sent you a lead — ${remaining}s to accept`,
+    tag: 'relay-live-lead',
+    requireInteraction: true,
+    silent: false,
+    renotify: true,
+  };
+
+  // Prefer Service Worker notification — always shows on Windows even when minimised
+  if (_swRegistration) {
+    try {
+      await _swRegistration.showNotification('🔔 Live Lead Incoming!', options);
+      // Auto-close via SW when lead expires
+      if (ttl > 0) {
+        setTimeout(async () => {
+          try {
+            const notifs = await _swRegistration.getNotifications({ tag: 'relay-live-lead' });
+            notifs.forEach(n => n.close());
+          } catch {}
+        }, ttl);
+      }
+      return;
+    } catch (err) {
+      console.warn('SW notification failed, falling back:', err);
+    }
+  }
+
+  // Fallback: standard Notification API
+  if (_activeLeadNotif) { try { _activeLeadNotif.close(); } catch {} _activeLeadNotif = null; }
   try {
-    // Note: data: URIs are blocked as notification icons in Chrome — omit icon entirely
-    const n = new Notification('🔔 Live Lead Incoming!', {
-      body: `${fromName} has sent you a lead — ${remaining}s to accept`,
-      tag: 'relay-live-lead',
-      requireInteraction: true,
-      silent: false,
-    });
+    const n = new Notification('🔔 Live Lead Incoming!', options);
     _activeLeadNotif = n;
     n.onclick = () => { window.focus(); n.close(); };
-    // Auto-close when the lead expires
-    const ttl = lead.expiresAt - Date.now();
     if (ttl > 0) setTimeout(() => { try { n.close(); } catch {} }, ttl);
   } catch (err) {
     console.error('Notification failed:', err);
@@ -2173,8 +2204,12 @@ function hideIncomingPopup() {
   incomingLead = null;
   document.getElementById('incomingOverlay').classList.remove('show');
   if (pcCountdownTimer) { clearInterval(pcCountdownTimer); pcCountdownTimer = null; }
-  // Dismiss the browser notification if still showing
+  // Dismiss browser/SW notification if still showing
   if (_activeLeadNotif) { try { _activeLeadNotif.close(); } catch {} _activeLeadNotif = null; }
+  if (_swRegistration) {
+    _swRegistration.getNotifications({ tag: 'relay-live-lead' })
+      .then(notifs => notifs.forEach(n => n.close())).catch(() => {});
+  }
 }
 
 async function acceptIncomingLead() {
@@ -3271,10 +3306,9 @@ boot();
       </div>
     </div>
   </div>
-
   <script>
     document.getElementById('notifModalEnable').addEventListener('click', async () => {
-      if (Notification.permission === 'denied') return; // button hidden when denied
+      if (Notification.permission === 'denied') return;
       const result = await Notification.requestPermission();
       closeNotifModal();
       updateNotifBanner();
